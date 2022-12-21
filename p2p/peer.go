@@ -109,6 +109,9 @@ type Peer struct {
 	log     log.Logger
 	created mclock.AbsTime
 
+	LastPingTime mclock.AbsTime
+	Rtt          int64 // long round trip time in microseconds, this will be used as the server distance measurement meter.
+
 	wg       sync.WaitGroup
 	protoErr chan error
 	closed   chan struct{}
@@ -230,6 +233,7 @@ func newPeer(log log.Logger, conn *conn, protocols []Protocol) *Peer {
 		rw:       conn,
 		running:  protomap,
 		created:  mclock.Now(),
+		Rtt:      1_000_000,
 		disc:     make(chan DiscReason),
 		protoErr: make(chan error, len(protomap)+1), // protocols + pingLoop
 		closed:   make(chan struct{}),
@@ -299,6 +303,7 @@ func (p *Peer) pingLoop() {
 	for {
 		select {
 		case <-ping.C:
+			p.LastPingTime = mclock.Now()
 			if err := SendItems(p.rw, pingMsg); err != nil {
 				p.protoErr <- err
 				return
@@ -326,6 +331,14 @@ func (p *Peer) readLoop(errc chan<- error) {
 	}
 }
 
+func minInt64(x, y int64) int64 {
+	if x < y {
+		return x
+	} else {
+		return y
+	}
+}
+
 func (p *Peer) handle(msg Msg) error {
 	switch {
 	case msg.Code == pingMsg:
@@ -338,6 +351,10 @@ func (p *Peer) handle(msg Msg) error {
 		rlp.Decode(msg.Payload, &m)
 		return m.R
 	case msg.Code < baseProtocolLength:
+		if msg.Code == pongMsg {
+			latestRoundTrip := mclock.Now().Sub(p.LastPingTime).Microseconds()
+			p.Rtt = minInt64(latestRoundTrip, p.Rtt)
+		}
 		// ignore other base protocol messages
 		return msg.Discard()
 	default:
