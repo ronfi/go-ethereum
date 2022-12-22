@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"go-ethereum/common/mclock"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -372,7 +373,7 @@ func TestTransactionTimeSort(t *testing.T) {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 
 		tx, _ := SignTx(NewTransaction(0, common.Address{}, big.NewInt(100), 100, big.NewInt(1), nil), signer, key)
-		tx.time = time.Unix(0, int64(len(keys)-start))
+		tx.time = mclock.AbsTime(int64(len(keys) - start))
 
 		groups[addr] = append(groups[addr], tx)
 	}

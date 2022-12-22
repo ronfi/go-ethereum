@@ -149,6 +149,11 @@ func NewPeerPipe(id enode.ID, name string, caps []Cap, pipe *MsgPipeRW) *Peer {
 	return p
 }
 
+// Duration returns the node's total connected time.
+func (p *Peer) Duration() time.Duration {
+	return mclock.Now().Sub(p.created)
+}
+
 // ID returns the node's public key.
 func (p *Peer) ID() enode.ID {
 	return p.rw.node.ID()

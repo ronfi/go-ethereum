@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"container/heap"
 	"errors"
+	"go-ethereum/common/mclock"
 	"io"
 	"math/big"
 	"sync/atomic"
@@ -49,8 +50,8 @@ const (
 
 // Transaction is an Ethereum transaction.
 type Transaction struct {
-	inner TxData    // Consensus contents of a transaction
-	time  time.Time // Time first seen locally (spam avoidance)
+	inner TxData         // Consensus contents of a transaction
+	time  mclock.AbsTime // Time first seen locally (spam avoidance)
 
 	// caches
 	hash atomic.Value
@@ -192,7 +193,7 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 // setDecoded sets the inner transaction and size after decoding.
 func (tx *Transaction) setDecoded(inner TxData, size int) {
 	tx.inner = inner
-	tx.time = time.Now()
+	tx.time = mclock.Now()
 	if size > 0 {
 		tx.size.Store(common.StorageSize(size))
 	}
@@ -246,6 +247,11 @@ func (tx *Transaction) Protected() bool {
 // Type returns the transaction type.
 func (tx *Transaction) Type() uint8 {
 	return tx.inner.txType()
+}
+
+// Time returns the transaction first seen time locally.
+func (tx *Transaction) Time() mclock.AbsTime {
+	return tx.time
 }
 
 // ChainId returns the EIP155 chain ID of the transaction. The return value will always be

@@ -35,6 +35,12 @@ func Now() AbsTime {
 	return AbsTime(nanotime())
 }
 
+// Since returns the time elapsed since t.
+// It is shorthand for Now().Sub(t).
+func Since(t AbsTime) time.Duration {
+	return Now().Sub(t)
+}
+
 // Add returns t + d as absolute time.
 func (t AbsTime) Add(d time.Duration) AbsTime {
 	return t + AbsTime(d)
@@ -43,6 +49,16 @@ func (t AbsTime) Add(d time.Duration) AbsTime {
 // Sub returns t - t2 as a duration.
 func (t AbsTime) Sub(t2 AbsTime) time.Duration {
 	return time.Duration(t - t2)
+}
+
+// Before reports whether the time instant t is before u.
+func (t AbsTime) Before(t2 AbsTime) bool {
+	return t < t2
+}
+
+// After reports whether the time instant t is after u.
+func (t AbsTime) After(t2 AbsTime) bool {
+	return t > t2
 }
 
 // The Clock interface makes it possible to replace the monotonic system clock with
