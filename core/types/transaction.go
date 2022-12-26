@@ -87,6 +87,15 @@ type TxData interface {
 	setSignatureValues(chainID, v, r, s *big.Int)
 }
 
+func (tx *Transaction) CachedFrom() (*common.Address, bool) {
+	if sc := tx.from.Load(); sc != nil {
+		sigCache := sc.(sigCache)
+		return &sigCache.from, true
+	} else {
+		return nil, false
+	}
+}
+
 // EncodeRLP implements rlp.Encoder
 func (tx *Transaction) EncodeRLP(w io.Writer) error {
 	if tx.Type() == LegacyTxType {
