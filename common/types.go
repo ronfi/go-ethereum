@@ -19,6 +19,7 @@ package common
 import (
 	"bytes"
 	"database/sql/driver"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -67,6 +68,16 @@ func HexToHash(s string) Hash { return BytesToHash(FromHex(s)) }
 
 // Bytes gets the byte representation of the underlying hash.
 func (h Hash) Bytes() []byte { return h[:] }
+
+// Uint64 gets the first 8 bytes representation of the underlying hash.
+func (h Hash) Uint64() uint64 {
+	return binary.BigEndian.Uint64(h[:8])
+}
+
+// TailUint64 gets the last 8 bytes representation of the underlying hash.
+func (h Hash) TailUint64() uint64 {
+	return binary.BigEndian.Uint64(h[24:])
+}
 
 // Big converts a hash to a big integer.
 func (h Hash) Big() *big.Int { return new(big.Int).SetBytes(h[:]) }

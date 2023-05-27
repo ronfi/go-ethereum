@@ -1,0 +1,13 @@
+{
+  "mysql": {
+    "host": "176.9.120.196",
+    "port": "3306",
+    "user": "root",
+    "pass": "rkdb",
+    "data": "rkdb"
+  },
+  "redis": {
+    "host": "176.9.120.196",
+    "port": "6379"
+  }
+}

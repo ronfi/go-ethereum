@@ -35,6 +35,12 @@ func Now() AbsTime {
 	return AbsTime(nanotime())
 }
 
+// Since returns the time elapsed since t.
+// It is shorthand for Now().Sub(t).
+func Since(t AbsTime) time.Duration {
+	return Now().Sub(t)
+}
+
 // Add returns t + d as absolute time.
 func (t AbsTime) Add(d time.Duration) AbsTime {
 	return t + AbsTime(d)

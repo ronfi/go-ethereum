@@ -44,6 +44,40 @@ type revision struct {
 
 type proofList [][]byte
 
+var (
+	TokenTransferEvent = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+	V2PairCreatedEvent = common.HexToHash("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9")
+	V2SyncEvent        = common.HexToHash("0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1")
+	V2SwapEvent        = common.HexToHash("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
+	V2MintEvent        = common.HexToHash("0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f")
+	V2BurnEvent        = common.HexToHash("0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496")
+	V3SwapEvent        = common.HexToHash("0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67")
+	V3MintEvent        = common.HexToHash("0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde")
+)
+
+func EventName(event common.Hash) string {
+	switch event {
+	case TokenTransferEvent:
+		return "token transfer"
+	case V2PairCreatedEvent:
+		return "uniswap_v2 pairCreated"
+	case V2SyncEvent:
+		return "uniswap_v2 sync"
+	case V2SwapEvent:
+		return "uniswap_v2 swap"
+	case V2MintEvent:
+		return "uniswap_v2 mint"
+	case V2BurnEvent:
+		return "uniswap_v2 burn"
+	case V3SwapEvent:
+		return "uniswap_v3 burn"
+	case V3MintEvent:
+		return "uniswap_v3 burn"
+	default:
+		return "unknown"
+	}
+}
+
 func (n *proofList) Put(key []byte, value []byte) error {
 	*n = append(*n, value)
 	return nil
