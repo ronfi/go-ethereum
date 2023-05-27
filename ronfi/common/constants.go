@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	CLIENT_URL = "/home/bsc/.bsc/geth.ipc"
+	CLIENT_URL = "/home/bsc/.geth/geth.ipc"
 	CHAIN_ID   = 56
 
 	HopsMaxAllowed = 8
