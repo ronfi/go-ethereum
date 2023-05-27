@@ -284,7 +284,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 						continue
 					}
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) && (sender != rcommon.RON_SWAP_F_ADDRESS) {
+					if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) {
 						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
 					}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())

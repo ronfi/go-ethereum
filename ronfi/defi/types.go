@@ -8,15 +8,13 @@ import (
 )
 
 type RonBalance struct {
-	Bnb float64
+	Eth float64
 
 	Total         float64
 	ContractTotal float64
 
-	ContractBnb  float64
 	ContractEth  float64
 	ContractBtc  float64
-	ContractCake float64
 	ContractUsdx float64
 	ContractChi  uint64
 }
@@ -24,14 +22,12 @@ type RonBalance struct {
 // Copy execute a deep copy
 func (b *RonBalance) Copy() RonBalance {
 	return RonBalance{
-		Bnb:           b.Bnb,
+		Eth:           b.Eth,
 		Total:         b.Total,
 		ContractTotal: b.ContractTotal,
 
-		ContractBnb:  b.ContractBnb,
 		ContractEth:  b.ContractEth,
 		ContractBtc:  b.ContractBtc,
-		ContractCake: b.ContractCake,
 		ContractUsdx: b.ContractUsdx,
 		ContractChi:  b.ContractChi,
 	}

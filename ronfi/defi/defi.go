@@ -532,24 +532,6 @@ func (di *Info) GetAllPairInfo() map[common.Address]*PairInfo {
 	return allPairInfoCopy
 }
 
-func (di *Info) GetAllPoolInfo() map[common.Address]*PoolInfo {
-	allPoolInfoCopy := make(map[common.Address]*PoolInfo)
-	di.lock.RLock()
-	for k, v := range di.poolsInfo {
-		if factory := di.GetV3Factory(k); factory != nil && *factory == rcommon.PANCAKE_V3_FACOTRY_ADDRESS {
-			allPoolInfoCopy[k] = v
-		}
-	}
-	for k, v := range di.newPoolsInfo {
-		if factory := di.GetV3Factory(k); factory != nil && *factory == rcommon.PANCAKE_V3_FACOTRY_ADDRESS {
-			allPoolInfoCopy[k] = v
-		}
-	}
-	di.lock.RUnlock()
-
-	return allPoolInfoCopy
-}
-
 func (di *Info) GetAllTokenInfo() map[common.Address]*TokenInfo {
 	allTokenInfoCopy := make(map[common.Address]*TokenInfo)
 	di.lock.RLock()

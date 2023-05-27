@@ -254,27 +254,6 @@ func (li *LoopIdMapSorted) Copy() LoopIdMapSorted {
 	}
 }
 
-func (li *LoopIdMapSorted) SortTopN() {
-	profits := make([]*ProfitSorted, 0, len(li.LoopIdMap))
-	for loopId, ap := range li.LoopIdMap {
-		profits = append(profits, &ProfitSorted{
-			Profit: ap.SumProfit,
-			LoopId: loopId,
-		})
-	}
-
-	if len(profits) > 1 {
-		sort.Slice(profits, func(i, j int) bool {
-			return profits[i].Less(profits[j])
-		})
-
-		if len(profits) >= LoopIdTopN {
-			profits = profits[:LoopIdTopN]
-		}
-	}
-	li.Profits = profits
-}
-
 type JsonRawKnowledge struct {
 	Kid       int     `json:"kid"`
 	Router    string  `json:"router"`

@@ -129,18 +129,18 @@ func NewStats(
 	balance := s.di.GetAllBalance(rcommon.AllTradingExecutors, false)
 	balanceV3 := s.di.GetAllBalance(rcommon.AllV3TradingExecutors, true)
 	log.Info("RonFi Stats Init",
-		"Initial Executor Bnb", balance.Bnb,
+		"Initial Executor Eth", balance.Eth,
 		"Initial Contract Balance in USD", balance.ContractTotal,
-		"Initial V3 Executor Bnb", balanceV3.Bnb,
+		"Initial V3 Executor Eth", balanceV3.Eth,
 		"Initial V3 Contract Balance in USD", balanceV3.ContractTotal)
 	s.initialBalance.Store(balance.Copy())
 	s.prevBalance.Store(balance)
 	s.chiBalance = balance.ContractChi
-	s.bnbBalance = balance.Bnb
+	s.bnbBalance = balance.Eth
 	s.v3InitialBalance.Store(balanceV3.Copy())
 	s.v3PrevBalance.Store(balanceV3.Copy())
 	s.v3ChiBalance = balanceV3.ContractChi
-	s.v3BnbBalance = balanceV3.Bnb
+	s.v3BnbBalance = balanceV3.Eth
 
 	PrevBlockTargetDexTxs = make(map[uint64]TargetDexInfo)
 	PrevBlockTxs = 0
