@@ -182,6 +182,7 @@ func (r *RonArbiter) mainLoop() {
 				clientInit.Reset(ClientInitialInterval) // retry in 5 seconds
 			} else {
 				r.client = client
+				r.di = defi.NewInfo(r.client)
 			}
 
 		case <-oracle.C:
