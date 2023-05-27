@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"math/big"
 	"sort"
 	"strings"
@@ -13,9 +13,9 @@ import (
 // Backend wraps all methods required for arbing.
 type Backend interface {
 	BlockChain() *core.BlockChain
-	TxPool() *core.TxPool
-	GetTradingDexTxCh() chan types.Transactions
-	RonBroadcastTransaction(tx *types.Transaction)
+	TxPool() *txpool.TxPool
+	//GetTradingDexTxCh() chan types.Transactions
+	//RonBroadcastTransaction(tx *types.Transaction)
 }
 
 type TokenDecimals struct {
@@ -344,10 +344,10 @@ func (js *JsonRawKnowledge) ToRawKnowledge() *RawKnowledge {
 
 func (p *RawKnowledge) ToKey() string {
 	var str strings.Builder
-	str.WriteString(p.Router.HexNoChecksum())
+	str.WriteString(p.Router.String())
 	for _, token := range p.Token {
 		str.WriteString("-")
-		str.WriteString(token.HexNoChecksum())
+		str.WriteString(token.String())
 	}
 	return str.String()
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"github.com/ethereum/go-ethereum/ronfi/stats"
 	"time"
 
@@ -47,10 +46,6 @@ type RonArbiter struct {
 	p2pHuntingTopN    int     // Control hunting on the Top N learning loops, only meaningful for p2p hunting
 	Gamma             float64 // Beta  = 0.998498873309329 // β = Sqrt( 1 - 0.3% ) = 0.998498873309329
 	// Gamma = 0.001503383459709 // γ = ( 1-β ) / β
-	knowledgeMap       rcommon.RonKnowledgeMap
-	loopsMap           *loops.LMap               // RonFi swaploops
-	newLoopsMap        *loops.LMap               // RonFi New Swap Loops, notified from obs-monitor.
-	loopsIdMap         loops.LIdMap              // Helper to map loopId to the true SwapLoop
 	pairGasMap         map[string]uint64         // the gas required for a pair swap (key: pair+dir)
 	feePatchMap        map[common.Address]uint64 // the patch for pool fee and/or token fee
 	flashNokPairs      map[common.Address]uint64
@@ -66,12 +61,6 @@ type RonArbiter struct {
 
 // New Only called once when geth startup
 func New(eth rcommon.Backend, chainConfig *params.ChainConfig) *RonArbiter {
-	dbConf := rcommon.LoadDBConfig()
-	if dbConf == nil {
-		log.Error("RonFi please make sure you have a correct db_config.json")
-		return nil
-	}
-
 	r := &RonArbiter{
 		eth:             eth,
 		chainConfig:     chainConfig,
@@ -82,9 +71,6 @@ func New(eth rcommon.Backend, chainConfig *params.ChainConfig) *RonArbiter {
 		totalArb:        1,
 		maxMatchedLoops: 48,
 	}
-
-	r.newLoopsMap = loops.NewDefaultLoopsMap()
-	r.loopsIdMap = make(loops.LIdMap)
 
 	go r.mainLoop()
 	return r
@@ -158,13 +144,13 @@ func (r *RonArbiter) Arbing() bool {
 	return r.running
 }
 
-func (r *RonArbiter) RonFiStats() {
+func (r *RonArbiter) StartStats() {
 	if r.stats != nil {
 		log.Warn("RonFi stats service already started")
 		return
 	}
 	// start stats service
-	r.stats = stats.NewStats(r.eth, r.client, r.di, r.loopsMap, r.GetPairGas(), r.GetDexPairs(), r.obsRouters, r.obsMethods, r.loopsIdMap)
+	r.stats = stats.NewStats(r.eth, r.client, r.di, r.GetPairGas(), r.GetDexPairs(), r.obsRouters, r.obsMethods)
 	if r.stats == nil {
 		log.Warn("RonFi stats service started failed")
 	} else {

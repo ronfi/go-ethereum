@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/tyler-smith/go-bip39"
 	"math/big"
 	"strings"
 	"time"
@@ -46,7 +47,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/tyler-smith/go-bip39"
 )
 
 // EthereumAPI provides an API to access Ethereum related information.
@@ -859,6 +859,14 @@ func (s *BlockChainAPI) GetStorageAt(ctx context.Context, address common.Address
 	}
 	res := state.GetState(address, key)
 	return res[:], state.Error()
+}
+
+func (s *BlockChainAPI) StartStats() {
+	s.b.StartStats()
+}
+
+func (s *BlockChainAPI) StopStats() {
+	s.b.StopStats()
 }
 
 // OverrideAccount indicates the overriding fields of account during the execution

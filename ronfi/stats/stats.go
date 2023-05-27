@@ -3,7 +3,6 @@ package stats
 import (
 	"context"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -73,9 +72,6 @@ type Stats struct {
 	prevResetTime   time.Time
 	obsMethods      map[uint64]string
 	obsRouters      map[common.Address]uint64
-
-	loopsMap   *loops.LMap
-	loopsIdMap loops.LIdMap
 }
 
 type miscStatCnt struct {
@@ -89,12 +85,10 @@ func NewStats(
 	eth rcommon.Backend,
 	client *ethclient.Client,
 	di *defi.Info,
-	loopsMap *loops.LMap,
 	pairGasMap map[string]uint64,
 	dexPairsMap map[common.Address]uint64,
 	obsRouters map[common.Address]uint64,
 	obsMethods map[uint64]string,
-	loopsIdMap loops.LIdMap,
 ) *Stats {
 	s := &Stats{
 		eth:    eth,
@@ -147,9 +141,6 @@ func NewStats(
 	s.v3PrevBalance.Store(balanceV3.Copy())
 	s.v3ChiBalance = balanceV3.ContractChi
 	s.v3BnbBalance = balanceV3.Bnb
-
-	s.loopsMap = loopsMap
-	s.loopsIdMap = loopsIdMap
 
 	PrevBlockTargetDexTxs = make(map[uint64]TargetDexInfo)
 	PrevBlockTxs = 0
@@ -219,10 +210,6 @@ func (s *Stats) Run() {
 					// report profit in every 10 minutes
 					s.dexVolumeReport()
 
-					for _, id := range ProfitObsIds {
-						s.obsProfitReport(id)
-					}
-					s.profitReport()
 					log.Info("RonFi arb") // splitter of profit report
 
 					// reset report automatically at every day 8:00am

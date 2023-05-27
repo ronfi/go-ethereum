@@ -20,6 +20,7 @@ package eth
 import (
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/ronfi"
 	"math/big"
 	"runtime"
 	"sync"
@@ -86,9 +87,10 @@ type Ethereum struct {
 
 	APIBackend *EthAPIBackend
 
-	miner     *miner.Miner
-	gasPrice  *big.Int
-	etherbase common.Address
+	miner      *miner.Miner
+	ronArbiter *ronfi.RonArbiter
+	gasPrice   *big.Int
+	etherbase  common.Address
 
 	networkID     uint64
 	netRPCService *ethapi.NetAPI
@@ -226,6 +228,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 
 	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
+
+	// Start RonFi service
+	eth.ronArbiter = ronfi.New(eth, chainConfig)
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
 	if eth.APIBackend.allowUnprotectedTxs {
@@ -524,4 +529,16 @@ func (s *Ethereum) Stop() error {
 	s.eventMux.Stop()
 
 	return nil
+}
+
+// StartStats Start RonFi Stats Service
+func (s *Ethereum) StartStats() {
+	log.Info("RonFi stats start")
+	s.ronArbiter.StartStats()
+}
+
+// StopStats Stop RonFi Stats Service
+func (s *Ethereum) StopStats() {
+	log.Info("RonFi stats stop")
+	s.ronArbiter.StopStats()
 }
