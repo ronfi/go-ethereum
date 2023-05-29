@@ -202,7 +202,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 					}
 				}
 			case state.V3SwapEvent:
-				if len(data) == 224 && len(vlog.Topics) == 3 {
+				if len(vlog.Topics) == 3 && len(data) >= 160 {
 					poolInfo = di.GetPoolInfo(address)
 					if poolInfo == nil {
 						continue

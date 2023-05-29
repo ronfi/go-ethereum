@@ -36,12 +36,12 @@ func InitRonFiOracle(client *ethclient.Client) bool {
 
 	if ethPriceFeed, err = oracle.NewChainlinkOracle(EthOracleAddr, client); err != nil {
 		log.Error("RonFi InitRonFiOracle fail", "err", err)
-		return retVal
+		return false
 	}
 
 	if btcPriceFeed, err = oracle.NewChainlinkOracle(BtcOracleAddr, client); err != nil {
 		log.Error("RonFi InitRonFiOracle fail", "err", err)
-		return retVal
+		return false
 	}
 
 	retVal = true
