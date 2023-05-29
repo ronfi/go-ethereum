@@ -15,43 +15,43 @@ func TestProxy(t *testing.T) {
 
 	tests := []test{
 		{
-			proxy:        "Eip1167",
-			proxyAddress: common.HexToAddress("0x716Cd63D7523D120a8Ab5bb97E149Aba5a726C76"),
-			expected:     common.HexToAddress("0x850655492DC9e3a347209DD950d952306e19A9C1"),
+			proxy:        "Eip1167 Minimal",
+			proxyAddress: common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+			expected:     common.HexToAddress("0xa2327a938Febf5FEC13baCFb16Ae10EcBc4cbDCF"),
 		},
 		{
 			proxy:        "Eip1967Logic",
-			proxyAddress: common.HexToAddress("0xe29F0B490F0d89CA7ACAc1C7BeD2E07eCAD65201"),
-			expected:     common.HexToAddress("0x5713Ae21F4Bb696A877c90CCcAE310eFF4c4652A"),
+			proxyAddress: common.HexToAddress("0x6b4eE7352406707003bC6f6b96595FD35925af48"),
+			expected:     common.HexToAddress("0xB0187178095e751E817dDC2e8EBe3fb1F7E46842"),
 		},
 		{
 			proxy:        "Eip1967Beacon",
-			proxyAddress: common.HexToAddress("0xEEcc149386caD42784539Fc8449408E7956a3a8e"),
-			expected:     common.HexToAddress("0x7F54C5d46fdd02d4db445D6F2dC44E642357fBE1"),
+			proxyAddress: common.HexToAddress("0xcEb49cB8E765E930B7290Ac42E8d26a99EbAa4Ce"),
+			expected:     common.HexToAddress("0x4A5aD53ed70357961e58Faf304CCfd06180D2C30"),
 		},
 		{
 			proxy:        "OpenZeppelin",
-			proxyAddress: common.HexToAddress("0x4b136E073D469f240983ACe06e3c5f776FCE45Ea"),
-			expected:     common.HexToAddress("0x261701115BFC2e1A3Cf79bd197937f7b3016A427"),
+			proxyAddress: common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+			expected:     common.HexToAddress("0xa2327a938Febf5FEC13baCFb16Ae10EcBc4cbDCF"),
 		},
 		{
 			proxy:        "Eip897",
-			proxyAddress: common.HexToAddress("0x99b0d6641A63Ce173E6EB063b3d3AED9A35Cf9bf"),
-			expected:     common.HexToAddress("0x6f8A975758436A5Ec38d2f9d2336504430465517"),
+			proxyAddress: common.HexToAddress("0xA8E03D0E75FA9a0bBa097266FC8e14284118e0EF"),
+			expected:     common.HexToAddress("0x164Ac16e514f4e47d201aFF991740E166d409b8A"),
 		},
 		{
 			proxy:        "Eip1822",
-			proxyAddress: common.HexToAddress("0xe87e15B9c7d989474Cb6d8c56b3DB4eFAD5b21E8"),
-			expected:     common.HexToAddress("0xCDB432013B83559C7942925495ABa373e3Eb5815"),
+			proxyAddress: common.HexToAddress("0x261b45D85cCFeAbb11F022eBa346ee8D1cd488c0"),
+			expected:     common.HexToAddress("0xf4dD399f6584B4FFd925C86782025A4282429D7c"),
 		},
 		{
 			proxy:        "GnosisSafeProxy",
-			proxyAddress: common.HexToAddress("0xccF45C824e26ff19597441B95586b7c7F536719d"),
-			expected:     common.HexToAddress("0x2BB001433cf04c1f7d71E3c40FED66b2b563065E"),
+			proxyAddress: common.HexToAddress("0x526254C12360D68D8F90c0cD9cFE5a32002e845A"),
+			expected:     common.HexToAddress("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552"),
 		},
 	}
 
-	client, err := ethclient.Dial("http://localhost:8545")
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
 	if err != nil {
 		t.Fatal("TestProxy dial eth client failed!")
 	}

@@ -93,7 +93,7 @@ func NewProxy(client *ethclient.Client) *Proxy {
 	}
 }
 
-func (p Proxy) detectProxyTarget(proxyAddress common.Address) (target common.Address, ok bool) {
+func (p *Proxy) detectProxyTarget(proxyAddress common.Address) (target common.Address, ok bool) {
 	p.lock.RLock()
 	if target, ok = p.proxyMap[proxyAddress]; ok {
 		p.lock.RUnlock()

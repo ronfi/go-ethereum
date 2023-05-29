@@ -48,6 +48,7 @@ func (s *Stats) report(header *types.Header) {
 		log.Warn("RonFi Stats report: block == nil", "blockNumber", blockNumber)
 		return
 	}
+
 	receipts := bc.GetReceiptsByHash(block.Hash())
 	var methodID uint32
 	blockTxs := block.Transactions()
