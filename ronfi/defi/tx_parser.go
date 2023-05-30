@@ -439,17 +439,13 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 
 		// minus bribe to miners
 		value := tx.Value()
-		valueAmount := rcommon.TokenToFloat(value, 18)
-		ethPrice := GetTradingTokenPrice(rcommon.WETH)
-		valueAmount /= ethPrice
-		valueInUsd := valueAmount * GetTradingTokenPrice(rcommon.USDC)
-		totalProfit -= valueInUsd
-
-		// minus gas fee
-		txFeeInEth := rcommon.EthBigInt2Float64(new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas())))
-		txFeeInUsd := GetTokenPrice(rcommon.WETH) * txFeeInEth
-		totalProfit -= txFeeInUsd
-		return totalProfit, v3Loop
+		if value.Cmp(big.NewInt(0)) > 0 {
+			valueAmount := rcommon.EthBigInt2Float64(value)
+			ethPrice := GetTradingTokenPrice(rcommon.WETH)
+			valueAmount /= ethPrice
+			valueInUsd := valueAmount * GetTradingTokenPrice(rcommon.USDC)
+			totalProfit -= valueInUsd
+		}
 	}
 
 	return 0.0, v3Loop
