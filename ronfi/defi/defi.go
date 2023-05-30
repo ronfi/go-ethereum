@@ -112,9 +112,9 @@ func (di *Info) GetPoolInfo(address common.Address) (info *PoolInfo) {
 					poolName := ""
 					if fee == nil {
 						fee = big.NewInt(0)
-						poolName = fmt.Sprintf("%s-%s Non Pancake V3, %d", token0Info.Symbol, token1Info.Symbol, fee.Int64())
+						poolName = fmt.Sprintf("%s-%s Non Uniswap V3, %d", token0Info.Symbol, token1Info.Symbol, fee.Int64())
 					} else {
-						poolName = fmt.Sprintf("%s-%s Pancake V3, %d", token0Info.Symbol, token1Info.Symbol, fee.Int64())
+						poolName = fmt.Sprintf("%s-%s Uniswap V3, %d", token0Info.Symbol, token1Info.Symbol, fee.Int64())
 					}
 					if token0Info != nil && token1Info != nil {
 						info = &PoolInfo{
