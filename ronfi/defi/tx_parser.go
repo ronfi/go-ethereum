@@ -383,33 +383,25 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 	swapPairsInfo := di.ExtractSwapPairInfo(allPairsMap, nil, tx, router, vLogs, RonFiExtractTypeStats)
 	if len(swapPairsInfo) > 1 {
 		isDex = true
-		head := swapPairsInfo[0]
-		tail := swapPairsInfo[len(swapPairsInfo)-1]
-		if head.TokenIn != rcommon.ZeroAddress && tail.TokenOut != rcommon.ZeroAddress &&
-			head.TokenIn == tail.TokenOut && tail.AmountOut != nil &&
-			head.AmountIn != nil {
-			if head.Address != tail.Address || len(swapPairsInfo) > 2 {
-				isDex = false
-				isObs = true
-			}
-		}
-		if !isObs {
-			return
-		}
+		isObs = false
 
-		// loops linkage check
-		for i := 1; i < len(swapPairsInfo); i++ {
-			tail = swapPairsInfo[i]
-			if head.TokenOut == rcommon.ZeroAddress ||
-				tail.TokenIn == rcommon.ZeroAddress ||
-				head.TokenOut != tail.TokenIn ||
-				head.To == rcommon.ZeroAddress ||
-				(head.To != tail.Address && head.To != *to) {
-				isDex = false
-				isObs = false
-				break
+		for i := 0; i < len(swapPairsInfo); i++ {
+			for j := i + 1; j < len(swapPairsInfo); j++ {
+				pairs := swapPairsInfo[i : j+1]
+				var k int
+				for k = 0; k < len(pairs)-1; k++ {
+					prev := pairs[k]
+					next := pairs[k+1]
+					if prev.To != next.Address && prev.To != *to || prev.TokenOut != next.TokenIn {
+						break
+					}
+				}
+				if k == len(pairs)-1 {
+					isDex = false
+					isObs = true
+					return
+				}
 			}
-			head = tail
 		}
 	}
 
