@@ -142,7 +142,7 @@ func SortTokens(tokenA, tokenB common.Address) (common.Address, common.Address, 
 	}
 }
 
-func BnbBigInt2Float64(num *big.Int) float64 {
+func EthBigInt2Float64(num *big.Int) float64 {
 	return float64(new(big.Int).Div(num, big.NewInt(params.GWei)).Int64()) / params.GWei
 }
 

@@ -210,7 +210,7 @@ func (s *Stats) obsReport(
 	s.obsStats.updateTotalArbTxs(id)
 	simpleSum := s.parseObs(id, block, tx, from, txHash, methodID, data, receipt)
 	txFeeInBnb := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(receipt.GasUsed))
-	txFee := rcommon.BnbBigInt2Float64(txFeeInBnb)
+	txFee := rcommon.EthBigInt2Float64(txFeeInBnb)
 	price := defi.GetTradingTokenPrice(rcommon.USDC)
 	txFeeInUSD := price * txFee
 	s.obsStats.updateTotalFee(id, txFeeInUSD)
