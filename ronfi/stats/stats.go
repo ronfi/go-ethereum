@@ -206,9 +206,12 @@ func (s *Stats) Run() {
 			{
 				s.report(header)
 
-				if blockNumber%200 == 0 && header.Number.Cmp(s.currentHeader.Number) > 0 {
+				if blockNumber%50 == 0 && header.Number.Cmp(s.currentHeader.Number) > 0 {
 					// report profit in every 10 minutes
 					s.dexVolumeReport()
+					for _, id := range ProfitObsIds {
+						s.obsProfitReport(id)
+					}
 
 					log.Info("RonFi arb") // splitter of profit report
 

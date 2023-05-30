@@ -364,7 +364,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 	return swapPairsInfo
 }
 
-func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLogs []*types.Log, router common.Address) (isObs bool) {
+func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLogs []*types.Log, router common.Address) (isDex bool, isObs bool) {
 	to := tx.To()
 	if to == nil {
 		return
@@ -382,12 +382,14 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 
 	swapPairsInfo := di.ExtractSwapPairInfo(allPairsMap, nil, tx, router, vLogs, RonFiExtractTypeStats)
 	if len(swapPairsInfo) > 1 {
+		isDex = true
 		head := swapPairsInfo[0]
 		tail := swapPairsInfo[len(swapPairsInfo)-1]
 		if head.TokenIn != rcommon.ZeroAddress && tail.TokenOut != rcommon.ZeroAddress &&
 			head.TokenIn == tail.TokenOut && tail.AmountOut != nil &&
 			head.AmountIn != nil && tail.AmountOut.Cmp(head.AmountIn) >= 0 {
 			if head.Address != tail.Address || len(swapPairsInfo) > 2 {
+				isDex = false
 				isObs = true
 			}
 		}
@@ -403,6 +405,7 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 				head.TokenOut != tail.TokenIn ||
 				head.To == rcommon.ZeroAddress ||
 				(head.To != tail.Address && head.To != *to) {
+				isDex = false
 				isObs = false
 				break
 			}

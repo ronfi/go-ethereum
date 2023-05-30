@@ -4,10 +4,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/mclock"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/dexparser"
+	"math/big"
 	"sort"
 	"strings"
 )
@@ -50,6 +54,7 @@ func (s *Stats) report(header *types.Header) {
 	}
 
 	receipts := bc.GetReceiptsByHash(block.Hash())
+	signer := types.MakeSigner(s.chain.Config(), header.Number, header.Time)
 	var methodID uint32
 	blockTxs := block.Transactions()
 	TargetDexTxs := make(map[uint64]TargetDexInfo, len(blockTxs))
@@ -123,9 +128,57 @@ func (s *Stats) report(header *types.Header) {
 			continue
 		}
 		receipt := receipts[txLookup.Index]
-		isObs := s.di.CheckIfObsTx(nil, tx, receipt.Logs, *tx.To())
-		if isObs {
-			log.Info("RonFi arb obs", "arbTx", tx.Hash().String(), "methodId", methodID)
+
+		isDex, isObs := s.di.CheckIfObsTx(nil, tx, receipt.Logs, *tx.To())
+		if isDex {
+			if receipt.Status == 1 {
+				var token common.Address
+				amountF := 0.0
+				found := false
+				for _, receiptLog := range receipt.Logs {
+					if len(receiptLog.Topics) > 0 && receiptLog.Topics[0] == state.TokenTransferEvent {
+						token = receiptLog.Address
+						if tInfo := s.di.GetTokenInfo(token); tInfo != nil {
+							if len(receiptLog.Data) != 32 {
+								continue
+							}
+							amount := new(big.Int).SetBytes(receiptLog.Data[:32])
+							amountF = rcommon.ToFloat(amount, tInfo.Decimals)
+							found = true
+							break //todo: check the wrong logic here! why break? missed stats for other transferred tokens in this tx.
+						}
+					} else {
+						continue
+					}
+				}
+
+				if found {
+					swapPairsInfo := s.di.ExtractSwapPairInfo(nil, nil, tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypeStats)
+					if len(swapPairsInfo) > 0 {
+						// stats dex volume
+						v, exist := s.dexTokensVol[token]
+						if !exist {
+							s.dexTokensVol[token] = v
+						} else {
+							s.dexTokensVol[token] = v + amountF
+						}
+
+						amountInUSD := defi.GetAmountInUSD(amountF, token) //todo: check what happen if this token is not in my limited list?
+						for _, pair := range swapPairsInfo {
+							old, ok := s.dexPairsVol[pair.Address]
+							if !ok {
+								s.dexPairsVol[pair.Address] = amountInUSD
+							} else {
+								s.dexPairsVol[pair.Address] = old + amountInUSD
+							}
+						}
+					}
+				}
+			}
+		} else if isObs {
+			number := block.NumberU64()
+			from, _ := types.Sender(signer, tx)
+			s.obsReport(Obsx, number, tx, from, tx.Hash().String(), methodID, data, receipt)
 		}
 	}
 }
@@ -138,6 +191,130 @@ func (s *Stats) dexReport(block uint64, txHash string, receipt *types.Receipt) {
 	default:
 		log.Info("RonFi arb dex", "dexTx", txHash, "b", block, "index", receipt.TransactionIndex)
 	}
+}
+
+func (s *Stats) obsReport(
+	id ObsId,
+	block uint64,
+	tx *types.Transaction,
+	from common.Address,
+	txHash string,
+	methodID uint32,
+	data []byte,
+	receipt *types.Receipt) {
+	if len(data) < 4 {
+		log.Warn(fmt.Sprintf("RonFi arb obs%s action unknown", id), "tx", tx.Hash().String(), "b", block)
+		return
+	}
+
+	s.obsStats.updateTotalArbTxs(id)
+	simpleSum := s.parseObs(id, block, tx, from, txHash, methodID, data, receipt)
+	txFeeInBnb := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(receipt.GasUsed))
+	txFee := rcommon.BnbBigInt2Float64(txFeeInBnb)
+	price := defi.GetTradingTokenPrice(rcommon.USDC)
+	txFeeInUSD := price * txFee
+	s.obsStats.updateTotalFee(id, txFeeInUSD)
+
+	// check duplicated input[]
+	isCopyHunting := false
+	for _, oldSum := range InputCheckSums {
+		if oldSum == simpleSum {
+			isCopyHunting = true
+			break
+		}
+	}
+	if !isCopyHunting {
+		InputCheckSums[IndexCheckSums%maxLenCheckSum] = simpleSum
+		IndexCheckSums++
+	} else {
+		s.obsStats.updateTotalCopied(id)
+	}
+
+	suffix := ""
+	abbrFrom := prefix6HexString(from.String())
+
+	status := false
+	switch id {
+	default:
+		if len(receipt.Logs) > 2 {
+			status = true
+		}
+	}
+
+	if !status {
+		s.obsStats.updateTotalFail(id)
+		if !isCopyHunting {
+			suffix = "         fail"
+		} else {
+			suffix = "    copy fail"
+		}
+		log.Info(fmt.Sprintf("RonFi arb obs%s", id)+suffix,
+			"arbTx", txHash,
+			"b", block,
+			"index", receipt.TransactionIndex,
+			"e", abbrFrom,
+			"f", rcommon.Float2Str(txFeeInUSD, 3),
+			"#", s.obsStats.getTotalFail(id))
+	} else {
+		s.obsStats.updateTotalSuccess(id)
+		if !isCopyHunting {
+			suffix = "         success"
+		} else {
+			suffix = "    copy success"
+		}
+		allRatio := s.obsStats.ratio(id)
+		profit, v3Hunting := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+
+		if id == Obsx {
+			isSandwichObs := false
+			if *tx.To() == ObsASwapAddr1 || *tx.To() == ObsASwapAddr2 || *tx.To() == ObsASwapAddr3 || *tx.To() == ObsASwapAddr4 || *tx.To() == ObsASwapAddr5 || *tx.To() == ObsASwapAddr6 {
+				isSandwichObs = true
+			}
+			if isSandwichObs || profit > 0 { // workaround for some profit calculation problem
+				s.obsStats.updateGrossProfit(id, profit) // Note: For Sandwich Attack obs, we need add the negative 'profit' also.
+				if v3Hunting {
+					s.obsStats.updateGrossV3Profit(id, profit)
+				}
+			}
+		} else {
+			s.obsStats.updateGrossProfit(id, profit)
+			if v3Hunting {
+				s.obsStats.updateGrossV3Profit(id, profit)
+			}
+		}
+
+		log.Info(fmt.Sprintf("RonFi arb obs%s", id)+suffix,
+			"arbTx", txHash,
+			"v3", v3Hunting,
+			"b", block,
+			"index", receipt.TransactionIndex,
+			"e", abbrFrom,
+			"f", rcommon.Float2Str(txFeeInUSD, 3),
+			"t", s.obsStats.getTotalSuccess(id),
+			"ok(%)", rcommon.Float2Str(allRatio, 1),
+			"p", rcommon.Float2Str(profit, 3))
+	}
+}
+
+func (s *Stats) parseObs(
+	id ObsId,
+	block uint64,
+	tx *types.Transaction,
+	from common.Address,
+	txHash string,
+	methodID uint32,
+	data []byte,
+	receipt *types.Receipt) (simpleSum uint64) {
+	switch id {
+	default:
+		if len(data) > 4 {
+			simpleSum = simpleCheckSum(data[4:]) + block + binary.BigEndian.Uint64(from[12:])
+		} else {
+			simpleSum = block + binary.BigEndian.Uint64(from[12:])
+		}
+	}
+
+	return
 }
 
 func (s *Stats) getPairNames(pair common.Address) (string, string, string) {
@@ -251,4 +428,45 @@ func (s *Stats) dexVolumeReport() {
 			break
 		}
 	}
+}
+
+func (s *Stats) obsProfitReport(id ObsId) {
+	log.Info("RonFi arb")
+
+	shortFee := s.obsStats.shortFee(id)
+	log.Info(fmt.Sprintf("RonFi arb obs%s bot fee: (short)", id), "$", rcommon.Float2Str(shortFee, 2))
+	s.obsStats.updateReportedTotalFee(id, s.obsStats.getTotalFee(id))
+
+	log.Info(fmt.Sprintf("RonFi arb obs%s bot fee: (total)", id), "$", rcommon.Float2Str(s.obsStats.getTotalFee(id), 2))
+	copyRate := s.obsStats.copyRate(id)
+	log.Info(fmt.Sprintf("RonFi arb obs%s txs copied", id), "copyRate(%)", copyRate, "totalCopied", s.obsStats.getTotalCopied(id))
+
+	obsTotalArbTxs := s.obsStats.getTotalArbTxs(id)
+	txSent := obsTotalArbTxs - s.obsStats.getReportedTotalArbTxs(id)
+	s.obsStats.updateReportedTotalArbTxs(id, obsTotalArbTxs)
+
+	gross := s.obsStats.getGrossProfit(id) - s.obsStats.getPrevGrossProfit(id)
+	grossV3 := s.obsStats.getPrevGrossV3Profit(id) - s.obsStats.getPrevGrossV3Profit(id)
+	net := gross - shortFee
+	log.Info(fmt.Sprintf("RonFi arb obs%s bot profit: (short)", id),
+		"gross($)", rcommon.Float2Str(gross, 2),
+		"net($)", rcommon.Float2Str(net, 2),
+		"grossV3($)", rcommon.Float2Str(grossV3, 2),
+		"txs", txSent,
+	)
+	s.obsStats.updatePrevGrossProfit(id, s.obsStats.getGrossProfit(id))
+	s.obsStats.updatePrevGrossV3Profit(id, s.obsStats.getGrossV3Profit(id))
+
+	huntingRate := float64(obsTotalArbTxs) / float64(s.txCount) * 1000
+	gross = s.obsStats.getGrossProfit(id)
+	grossV3 = s.obsStats.getGrossV3Profit(id)
+	net = gross - s.obsStats.getTotalFee(id)
+	log.Info(fmt.Sprintf("RonFi arb obs%s bot profit: (total)", id),
+		"gross($)", rcommon.Float2Str(gross, 2),
+		"net($)", rcommon.Float2Str(net, 2),
+		"grossV3($)", rcommon.Float2Str(grossV3, 2),
+		"huntingRate(‰)", huntingRate,
+		"txs", obsTotalArbTxs,
+		"runtime", mclock.Since(s.startTime),
+	)
 }

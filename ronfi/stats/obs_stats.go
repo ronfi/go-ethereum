@@ -19,7 +19,7 @@ type ObsStats struct {
 type ObsAllStatsMap map[ObsId]*ObsStats
 
 var (
-	ProfitObsIds = []ObsId{Obs1, Obs3, Obs4, Obs5, Obs6, Obs7, Obs8, Obs9, Obsx}
+	ProfitObsIds = []ObsId{Obsx}
 )
 
 func (oa ObsAllStatsMap) init() {
