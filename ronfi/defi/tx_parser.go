@@ -381,35 +381,15 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 	}
 
 	swapPairsInfo := di.ExtractSwapPairInfo(allPairsMap, nil, tx, router, vLogs, RonFiExtractTypeStats)
-	if len(swapPairsInfo) > 1 {
-		isDex = true
-		head := swapPairsInfo[0]
-		tail := swapPairsInfo[len(swapPairsInfo)-1]
-		if head.TokenIn != rcommon.ZeroAddress && tail.TokenOut != rcommon.ZeroAddress &&
-			head.TokenIn == tail.TokenOut && tail.AmountOut != nil &&
-			head.AmountIn != nil {
-			if head.Address != tail.Address || len(swapPairsInfo) > 2 {
+	length := len(swapPairsInfo)
+	if length > 1 {
+		head := 0
+		for i := head; i < length; i++ {
+			if _, ok := di.checkIfLoop(swapPairsInfo[head : i+1]); ok {
 				isDex = false
 				isObs = true
-			}
-		}
-		if !isObs {
-			return
-		}
-
-		// loops linkage check
-		for i := 1; i < len(swapPairsInfo); i++ {
-			tail = swapPairsInfo[i]
-			if head.TokenOut == rcommon.ZeroAddress ||
-				tail.TokenIn == rcommon.ZeroAddress ||
-				head.TokenOut != tail.TokenIn ||
-				head.To == rcommon.ZeroAddress ||
-				(head.To != tail.Address && head.To != *to) {
-				isDex = false
-				isObs = false
 				break
 			}
-			head = tail
 		}
 	}
 
