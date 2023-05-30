@@ -446,6 +446,8 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 			valueInUsd := valueAmount * GetTradingTokenPrice(rcommon.USDC)
 			totalProfit -= valueInUsd
 		}
+
+		return totalProfit, v3Loop
 	}
 
 	return 0.0, v3Loop
