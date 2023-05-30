@@ -266,16 +266,16 @@ func (s *Stats) obsReport(
 		profit, v3Hunting := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
 
 		if id == Obsx {
-			isSandwichObs := false
-			if *tx.To() == ObsASwapAddr1 || *tx.To() == ObsASwapAddr2 || *tx.To() == ObsASwapAddr3 || *tx.To() == ObsASwapAddr4 || *tx.To() == ObsASwapAddr5 || *tx.To() == ObsASwapAddr6 {
-				isSandwichObs = true
+			//isSandwichObs := false
+			//if *tx.To() == ObsASwapAddr1 || *tx.To() == ObsASwapAddr2 || *tx.To() == ObsASwapAddr3 || *tx.To() == ObsASwapAddr4 || *tx.To() == ObsASwapAddr5 || *tx.To() == ObsASwapAddr6 {
+			//	isSandwichObs = true
+			//}
+			//if isSandwichObs || profit > 0 { // workaround for some profit calculation problem
+			s.obsStats.updateGrossProfit(id, profit) // Note: For Sandwich Attack obs, we need add the negative 'profit' also.
+			if v3Hunting {
+				s.obsStats.updateGrossV3Profit(id, profit)
 			}
-			if isSandwichObs || profit > 0 { // workaround for some profit calculation problem
-				s.obsStats.updateGrossProfit(id, profit) // Note: For Sandwich Attack obs, we need add the negative 'profit' also.
-				if v3Hunting {
-					s.obsStats.updateGrossV3Profit(id, profit)
-				}
-			}
+			//}
 		} else {
 			s.obsStats.updateGrossProfit(id, profit)
 			if v3Hunting {
