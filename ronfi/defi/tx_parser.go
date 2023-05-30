@@ -387,7 +387,7 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 		tail := swapPairsInfo[len(swapPairsInfo)-1]
 		if head.TokenIn != rcommon.ZeroAddress && tail.TokenOut != rcommon.ZeroAddress &&
 			head.TokenIn == tail.TokenOut && tail.AmountOut != nil &&
-			head.AmountIn != nil && tail.AmountOut.Cmp(head.AmountIn) >= 0 {
+			head.AmountIn != nil {
 			if head.Address != tail.Address || len(swapPairsInfo) > 2 {
 				isDex = false
 				isObs = true

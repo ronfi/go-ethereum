@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"testing"
 )
 
@@ -24,12 +23,12 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 
 	info := NewInfo(client)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x262c03b63b117ab469a0b8d2b891a37b3f8d5410444c59c8d6bf98c52f56734d"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x944de88624fd5b5d9586fb43cc8fc0c9ed5ac97bf2187f5930b61356402c37f8"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x262c03b63b117ab469a0b8d2b891a37b3f8d5410444c59c8d6bf98c52f56734d"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x944de88624fd5b5d9586fb43cc8fc0c9ed5ac97bf2187f5930b61356402c37f8"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
@@ -57,47 +56,16 @@ func TestInfo_CheckIfObs(t *testing.T) {
 
 	info := NewInfo(client)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xdf0d24e771e8931f9914fd08c116f61d4c8a8e040e9b1ad6f0a15a897c395f04"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x944de88624fd5b5d9586fb43cc8fc0c9ed5ac97bf2187f5930b61356402c37f8"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xdf0d24e771e8931f9914fd08c116f61d4c8a8e040e9b1ad6f0a15a897c395f04"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x944de88624fd5b5d9586fb43cc8fc0c9ed5ac97bf2187f5930b61356402c37f8"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
 
-	isObs := false
-	obsAddr := *tx.To()
-	swapPairsInfo := info.ExtractSwapPairInfo(nil, nil, tx, *tx.To(), receipt.Logs, RonFiExtractTypeStats)
-	if len(swapPairsInfo) > 1 {
-		head := swapPairsInfo[0]
-		tail := swapPairsInfo[len(swapPairsInfo)-1]
-		if head.TokenIn != rcommon.ZeroAddress && tail.TokenOut != rcommon.ZeroAddress &&
-			head.TokenIn == tail.TokenOut && tail.AmountOut != nil &&
-			head.AmountIn != nil && tail.AmountOut.Cmp(head.AmountIn) >= 0 {
-			if head.Address != tail.Address || len(swapPairsInfo) > 2 {
-				isObs = true
-			}
-		}
-		if !isObs {
-			return
-		}
-
-		// loops linkage check
-		for i := 1; i < len(swapPairsInfo); i++ {
-			tail = swapPairsInfo[i]
-			if head.TokenOut == rcommon.ZeroAddress ||
-				tail.TokenIn == rcommon.ZeroAddress ||
-				head.TokenOut != tail.TokenIn ||
-				head.To == rcommon.ZeroAddress ||
-				(head.To != tail.Address && head.To != obsAddr) {
-				isObs = false
-				break
-			}
-			head = tail
-		}
-	}
-
-	t.Logf("isObs: %v", isObs)
+	isDex, isObs := info.CheckIfObsTx(nil, tx, receipt.Logs, *tx.To())
+	t.Logf("isDex: %v, isObs: %v", isDex, isObs)
 }
