@@ -390,9 +390,13 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 				pairs := swapPairsInfo[i : j+1]
 				var k int
 				for k = 0; k < len(pairs)-1; k++ {
+					head := pairs[0]
 					prev := pairs[k]
 					next := pairs[k+1]
-					if prev.To != next.Address && prev.To != *to || prev.TokenOut != next.TokenIn {
+					tail := next
+					if prev.To != next.Address && prev.To != *to ||
+						prev.TokenOut != next.TokenIn ||
+						head.TokenIn != tail.TokenOut {
 						break
 					}
 				}
