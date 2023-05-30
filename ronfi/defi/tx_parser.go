@@ -251,6 +251,8 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 						V3:           true,
 						BothBriToken: false,
 						KnownPair:    false,
+						Sender:       sender,
+						To:           to,
 						TokenIn:      tokenIn,
 						TokenOut:     tokenOut,
 						KeyToken:     tokenIn,
