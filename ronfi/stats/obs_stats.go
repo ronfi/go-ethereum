@@ -7,6 +7,8 @@ type ObsStats struct {
 	prevGrossProfit     float64
 	grossV3Profit       float64
 	prevGrossV3Profit   float64
+	slush               float64
+	prevSlush           float64
 	totalFee            float64
 	reportedTotalFee    float64
 	totalArbTxs         uint64
@@ -36,12 +38,28 @@ func (oa ObsAllStatsMap) getGrossProfit(id ObsId) float64 {
 	return oa[id].grossProfit
 }
 
+func (oa ObsAllStatsMap) updateSlush(id ObsId, slush float64) {
+	oa[id].slush += slush
+}
+
+func (oa ObsAllStatsMap) getSlush(id ObsId) float64 {
+	return oa[id].slush
+}
+
 func (oa ObsAllStatsMap) updatePrevGrossProfit(id ObsId, prevGrossProfit float64) {
 	oa[id].prevGrossProfit = prevGrossProfit
 }
 
 func (oa ObsAllStatsMap) getPrevGrossProfit(id ObsId) float64 {
 	return oa[id].prevGrossProfit
+}
+
+func (oa ObsAllStatsMap) updatePrevSlush(id ObsId, prevSlush float64) {
+	oa[id].prevSlush = prevSlush
+}
+
+func (oa ObsAllStatsMap) getPrevSlush(id ObsId) float64 {
+	return oa[id].prevSlush
 }
 
 func (oa ObsAllStatsMap) updateGrossV3Profit(id ObsId, grossProfit float64) {

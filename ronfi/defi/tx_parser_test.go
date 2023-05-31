@@ -23,21 +23,21 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 
 	info := NewInfo(client)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xe769a0cee33813b6126d0e76b5fc8b57a25d6e73bedf36b3035346b49120a450"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x6c6856cdaabf7a6779f4649d74cf7b33681b21dc312ce60410a1d2748450dd66"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xe769a0cee33813b6126d0e76b5fc8b57a25d6e73bedf36b3035346b49120a450"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x6c6856cdaabf7a6779f4649d74cf7b33681b21dc312ce60410a1d2748450dd66"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
 
-	profit, v3Hunting := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+	profit, slush, v3Hunting := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
 	if profit == 0.0 {
 		t.Fatal("TestInfo_GetArbTxProfit calculate profit failed!")
 	}
-	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v", v3Hunting, profit)
+	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v, slush: %v", v3Hunting, profit, slush)
 }
 
 func TestInfo_CheckIfObs(t *testing.T) {

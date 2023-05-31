@@ -414,7 +414,7 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 	return
 }
 
-func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router common.Address) (float64, bool) {
+func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router common.Address) (float64, float64, bool) {
 	v3Loop := false
 	swapPairsInfo := di.ExtractSwapPairInfo(nil, nil, tx, router, vLogs, RonFiExtractTypeStats)
 	for _, pairInfo := range swapPairsInfo {
@@ -447,7 +447,12 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 		}
 	}
 
-	return totalProfit, v3Loop
+	slush := 0.0
+	if value := tx.Value(); value != nil {
+		slush = rcommon.EthBigInt2Float64(value)
+	}
+
+	return totalProfit, slush, v3Loop
 }
 
 func (di *Info) loopProfit(swapPairsInfo []*SwapPairInfo) (profit float64) {
