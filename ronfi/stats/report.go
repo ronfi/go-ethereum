@@ -263,9 +263,8 @@ func (s *Stats) obsReport(
 			suffix = "    copy success"
 		}
 		allRatio := s.obsStats.ratio(id)
-		profit, slush, v3Hunting := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+		profit, v3Hunting := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
 		s.obsStats.updateGrossProfit(id, profit)
-		s.obsStats.updateSlush(id, slush)
 		if v3Hunting {
 			s.obsStats.updateGrossV3Profit(id, profit)
 		}
@@ -279,8 +278,7 @@ func (s *Stats) obsReport(
 			"f", rcommon.Float2Str(txFeeInUSD, 3),
 			"t", s.obsStats.getTotalSuccess(id),
 			"ok(%)", rcommon.Float2Str(allRatio, 1),
-			"p", rcommon.Float2Str(profit, 3),
-			"s", rcommon.Float2Str(slush, 3))
+			"p", rcommon.Float2Str(profit, 3))
 	}
 }
 
@@ -435,27 +433,22 @@ func (s *Stats) obsProfitReport(id ObsId) {
 
 	gross := s.obsStats.getGrossProfit(id) - s.obsStats.getPrevGrossProfit(id)
 	grossV3 := s.obsStats.getPrevGrossV3Profit(id) - s.obsStats.getPrevGrossV3Profit(id)
-	slush := s.obsStats.getSlush(id) - s.obsStats.getPrevSlush(id)
 	net := gross - shortFee
 	log.Info(fmt.Sprintf("RonFi arb obs%s bot profit: (short)", id),
 		"gross($)", rcommon.Float2Str(gross, 2),
-		"slush($)", rcommon.Float2Str(slush, 2),
 		"net($)", rcommon.Float2Str(net, 2),
 		"grossV3($)", rcommon.Float2Str(grossV3, 2),
 		"txs", txSent,
 	)
 	s.obsStats.updatePrevGrossProfit(id, s.obsStats.getGrossProfit(id))
 	s.obsStats.updatePrevGrossV3Profit(id, s.obsStats.getGrossV3Profit(id))
-	s.obsStats.updatePrevSlush(id, s.obsStats.getSlush(id))
 
 	huntingRate := float64(obsTotalArbTxs) / float64(s.txCount) * 1000
 	gross = s.obsStats.getGrossProfit(id)
 	grossV3 = s.obsStats.getGrossV3Profit(id)
-	slush = s.obsStats.getSlush(id)
 	net = gross - s.obsStats.getTotalFee(id)
 	log.Info(fmt.Sprintf("RonFi arb obs%s bot profit: (total)", id),
 		"gross($)", rcommon.Float2Str(gross, 2),
-		"slush($)", rcommon.Float2Str(slush, 2),
 		"net($)", rcommon.Float2Str(net, 2),
 		"grossV3($)", rcommon.Float2Str(grossV3, 2),
 		"huntingRate(‰)", huntingRate,

@@ -23,21 +23,21 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 
 	info := NewInfo(client)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x6c6856cdaabf7a6779f4649d74cf7b33681b21dc312ce60410a1d2748450dd66"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xea867e83606a106b2fc943b6da1acc68823fe78bade7b23b39a438749713bfdc"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x6c6856cdaabf7a6779f4649d74cf7b33681b21dc312ce60410a1d2748450dd66"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xea867e83606a106b2fc943b6da1acc68823fe78bade7b23b39a438749713bfdc"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
 
-	profit, slush, v3Hunting := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+	profit, v3Hunting := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
 	if profit == 0.0 {
 		t.Fatal("TestInfo_GetArbTxProfit calculate profit failed!")
 	}
-	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v, slush: %v", v3Hunting, profit, slush)
+	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v", v3Hunting, profit)
 }
 
 func TestInfo_CheckIfObs(t *testing.T) {
@@ -56,12 +56,12 @@ func TestInfo_CheckIfObs(t *testing.T) {
 
 	info := NewInfo(client)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xa7e4481a58f1390b9256dd52af7e22cecf13ac4124212960fb2e4735d45a6d89"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xea867e83606a106b2fc943b6da1acc68823fe78bade7b23b39a438749713bfdc"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xa7e4481a58f1390b9256dd52af7e22cecf13ac4124212960fb2e4735d45a6d89"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xea867e83606a106b2fc943b6da1acc68823fe78bade7b23b39a438749713bfdc"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
