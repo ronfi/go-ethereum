@@ -279,7 +279,8 @@ func (s *Stats) obsReport(
 			"f", rcommon.Float2Str(txFeeInUSD, 3),
 			"t", s.obsStats.getTotalSuccess(id),
 			"ok(%)", rcommon.Float2Str(allRatio, 1),
-			"p", rcommon.Float2Str(profit, 3))
+			"p", rcommon.Float2Str(profit, 3),
+			"s", rcommon.Float2Str(slush, 3))
 	}
 }
 
