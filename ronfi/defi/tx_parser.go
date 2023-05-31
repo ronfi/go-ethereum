@@ -449,7 +449,7 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 
 	slush := 0.0
 	if value := tx.Value(); value != nil {
-		slush = rcommon.EthBigInt2Float64(value)
+		slush = rcommon.EthBigInt2Float64(value) * GetTokenPrice(rcommon.WETH)
 	}
 
 	return totalProfit, slush, v3Loop
