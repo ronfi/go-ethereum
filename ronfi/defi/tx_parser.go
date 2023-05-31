@@ -422,38 +422,49 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 			v3Loop = true
 		}
 	}
-	length := len(swapPairsInfo)
-	if length > 1 {
-		loops := 0
-		totalProfit := 0.0
-		head := 0
-		for i := head; i < length; i++ {
-			if profit, ok := di.checkIfLoop(swapPairsInfo[head : i+1]); ok {
-				totalProfit += profit
-				head = i + 1
-				loops++
+
+	totalProfit := 0.0
+	if len(swapPairsInfo) > 1 {
+		for i := 0; i < len(swapPairsInfo); i++ {
+			for j := i + 1; j < len(swapPairsInfo); j++ {
+				pairs := swapPairsInfo[i : j+1]
+				var k int
+				for k = 0; k < len(pairs)-1; k++ {
+					head := pairs[0]
+					prev := pairs[k]
+					next := pairs[k+1]
+					tail := next
+					if prev.To != next.Address && prev.To != *tx.To() ||
+						prev.TokenOut != next.TokenIn ||
+						head.TokenIn != tail.TokenOut {
+						break
+					}
+				}
+				if k == len(pairs)-1 {
+					totalProfit += di.loopProfit(pairs)
+				}
 			}
 		}
-
-		// minus bribe to miners
-		value := tx.Value()
-		if value.Cmp(big.NewInt(0)) > 0 {
-			valueAmount := rcommon.EthBigInt2Float64(value)
-			ethPrice := GetTradingTokenPrice(rcommon.WETH)
-			valueAmount /= ethPrice
-			valueInUsd := valueAmount * GetTradingTokenPrice(rcommon.USDC)
-			totalProfit -= valueInUsd
-		}
-
-		return totalProfit, v3Loop
 	}
 
-	return 0.0, v3Loop
+	return totalProfit, v3Loop
 }
 
-func (di *Info) checkIfLoop(swapPairsInfo []*SwapPairInfo) (profit float64, ok bool) {
+func (di *Info) loopProfit(swapPairsInfo []*SwapPairInfo) (profit float64) {
 	if len(swapPairsInfo) < 2 {
-		return 0.0, false
+		return
+	}
+
+	prev := swapPairsInfo[0]
+	next := swapPairsInfo[1]
+	// check if head/tail right?
+	if prev.AmountOut.Cmp(next.AmountIn) != 0 &&
+		next.AmountOut.Cmp(prev.AmountIn) == 0 {
+		// reverse
+		for i := len(swapPairsInfo)/2 - 1; i >= 0; i-- {
+			opp := len(swapPairsInfo) - 1 - i
+			swapPairsInfo[i], swapPairsInfo[opp] = swapPairsInfo[opp], swapPairsInfo[i]
+		}
 	}
 
 	head := swapPairsInfo[0]
@@ -461,59 +472,23 @@ func (di *Info) checkIfLoop(swapPairsInfo []*SwapPairInfo) (profit float64, ok b
 	token := head.TokenIn
 
 	isTradableToken := false
-	isEqual := false
 	amount := 0.0
 	defer func() {
 		// finally, we got the real profit
 		if isTradableToken {
 			price := GetTradingTokenPrice(token)
 			amount /= price
-			profit, ok = amount*GetTradingTokenPrice(rcommon.USDC), true
-		} else {
-			profit, ok = 0.0, false
+			profit = amount * GetTradingTokenPrice(rcommon.USDC)
 		}
 	}()
 
 	if head.TokenIn == tail.TokenOut {
-		// 1st try with tail.tokenOut
-		_, isTradableToken = rcommon.TradableTokens[token]
-		if tail.AmountOut.Cmp(head.AmountIn) == 0 {
-			isEqual = true
-		}
-		if isTradableToken && !isEqual { //todo: what if this token has token fee?
-			if isTradableToken {
-				decimals := uint64(18)
-				if tInfo := di.GetTokenInfo(token); tInfo != nil {
-					decimals = tInfo.Decimals
-				}
-				amount = rcommon.TokenToFloat(new(big.Int).Sub(tail.AmountOut, head.AmountIn), decimals) // profit on tail
+		if _, isTradableToken = rcommon.TradableTokens[token]; isTradableToken {
+			decimals := uint64(18)
+			if tInfo := di.GetTokenInfo(token); tInfo != nil {
+				decimals = tInfo.Decimals
 			}
-			return
-		}
-
-		// 2nd try and more tries with (this.tokenOut - next.tokenIn)
-		for i := len(swapPairsInfo) - 2; i >= 0; i-- {
-			this := swapPairsInfo[i]
-			next := swapPairsInfo[i+1]
-			if this.TokenOut != next.TokenIn { // not a correct loop
-				return
-			}
-
-			token = this.TokenOut
-			_, isTradableToken = rcommon.TradableTokens[token]
-			if this.AmountOut.Cmp(next.AmountIn) != 0 {
-				isEqual = false
-			}
-			if isTradableToken && !isEqual {
-				if isTradableToken {
-					decimals := uint64(18)
-					if tInfo := di.GetTokenInfo(token); tInfo != nil {
-						decimals = tInfo.Decimals
-					}
-					amount = rcommon.TokenToFloat(new(big.Int).Sub(this.AmountOut, next.AmountIn), decimals) // profit on this
-				}
-				return
-			}
+			amount = rcommon.TokenToFloat(new(big.Int).Sub(tail.AmountOut, head.AmountIn), decimals) // profit on tail
 		}
 	}
 	return
