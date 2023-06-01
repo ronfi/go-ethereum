@@ -178,7 +178,11 @@ func (s *Stats) report(header *types.Header) {
 		} else if isObs {
 			number := block.NumberU64()
 			from, _ := types.Sender(signer, tx)
-			s.obsReport(Obsx, number, tx, from, tx.Hash().String(), methodID, data, receipt)
+			if *to == Obs1SwapAddr {
+				s.obsReport(Obs1, number, tx, from, tx.Hash().String(), methodID, data, receipt)
+			} else {
+				s.obsReport(Obsx, number, tx, from, tx.Hash().String(), methodID, data, receipt)
+			}
 		}
 	}
 }
