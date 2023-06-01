@@ -1,16 +1,11 @@
 #!/bin/bash
 
-#HOST="172.31.85.248"
-#PORT="3306"
-#USER="bsc"
-#PASS="ronfi"
-HOST="176.9.120.196"
+HOST="172.31.85.248"
 PORT="3306"
 USER="bsc"
 PASS="ronfi"
 
-
-DATABASE="rkdb-eth"
+DATABASE="rkdb_eth"
 
 newDB(){
   mysql -h $HOST -P $PORT -u$USER -p$PASS -e "
