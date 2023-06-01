@@ -12,7 +12,7 @@ newDB(){
     drop database if exists $DATABASE;
     create database $DATABASE;
     use $DATABASE;
-    create table if not exists loops(id int not null auto_increment, loopsId char(66) not null unique, path varchar(1024), poolFee char(32), tokenFee char(32), direction char(32), indexes char(32), counts int, canceled tinyint(1) not null default 0, hasV3 tinyint(1) not null default 0, primary key(id));
+    create table if not exists loops(id int not null auto_increment, loopsId char(66) not null unique, path varchar(1024), poolFee char(32), tokenFee char(32), direction char(32), indexes char(32), counts int, canceled tinyint(1) not null default 0, primary key(id));
     create table if not exists obsall(id int not null auto_increment, tx char(66) not null unique, obsId char(1), loops varchar(2048), primary key(id));
     create table if not exists pair_dir_gas(id int not null auto_increment, pairDir char(44) not null unique, gas int, primary key(id));
     create table if not exists dex_pairs(id int not null auto_increment, pair char(44) not null unique, frequency int, primary key(id));
