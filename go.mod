@@ -26,6 +26,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff
 	github.com/gballet/go-verkle v0.0.0-20220902153445-097bd83b7732
+	github.com/go-sql-driver/mysql v1.7.1
 	github.com/go-stack/stack v1.8.1
 	github.com/gofrs/flock v0.8.1
 	github.com/golang-jwt/jwt/v4 v4.3.0
@@ -54,6 +55,7 @@ require (
 	github.com/protolambda/bls12-381-util v0.0.0-20220416220906-d8552aa452c7
 	github.com/rs/cors v1.7.0
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
+	github.com/shopspring/decimal v1.3.1
 	github.com/status-im/keycard-go v0.2.0
 	github.com/stretchr/testify v1.8.1
 	github.com/supranational/blst v0.3.11-0.20230406105308-e9dfc5ee724b
@@ -119,7 +121,6 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
