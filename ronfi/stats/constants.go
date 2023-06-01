@@ -16,6 +16,7 @@ const (
 
 	Ron  = "0"
 	Obs1 = "1"
+	Obs2 = "2"
 	Obs3 = "3"
 	Obs4 = "4"
 	Obs5 = "5"
@@ -50,4 +51,6 @@ var (
 	//Obs9Method    = uint32(0xc0cac0ca)
 
 	Obs1SwapAddr = common.HexToAddress("0xc11ce44147c9f6149fbe54adb0588523c38718d7")
+	Obs2SwapAddr = common.HexToAddress("0xdB8D95f9a3180e00507c9745eEFc9287d553b481")
+	Obs3SwapAddr = common.HexToAddress("0x2d2A7d56773ae7d5c7b9f1B57f7Be05039447B4D")
 )
