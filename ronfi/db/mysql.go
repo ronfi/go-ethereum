@@ -343,32 +343,6 @@ func (sql *Mysql) UpdatePairGas(pairDirGasMap map[string]uint64) int64 {
 	return -1
 }
 
-func (sql *Mysql) LoadFeePatch() map[common.Address]uint64 {
-	querySQL := fmt.Sprintf("select addr, fee from fee_patch;")
-	rows, err := sql.db.Query(querySQL)
-	if err != nil {
-		log.Warn("RonFi Mysql LoadFeePatch query data failed", "querySQL", querySQL, "err", err)
-		return nil
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	feePatchMap := make(map[common.Address]uint64)
-	for rows.Next() {
-		var (
-			addr string
-			fee  uint64
-		)
-
-		if err = rows.Scan(&addr, &fee); err == nil {
-			feePatchMap[common.HexToAddress(addr)] = fee
-		}
-	}
-
-	return feePatchMap
-}
-
 func (sql *Mysql) LoadDexPairs() map[common.Address]uint64 {
 	querySQL := fmt.Sprintf("select pair, frequency from dex_pairs;")
 	rows, err := sql.db.Query(querySQL)

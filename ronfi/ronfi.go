@@ -56,8 +56,7 @@ type RonArbiter struct {
 	loopsMap           *loops.LMap // RonFi swaploops
 	newLoopsMap        *loops.LMap // RonFi New Swap Loops, notified from obs-monitor.
 	loopsIdMap         loops.LIdMap
-	pairGasMap         map[string]uint64         // the gas required for a pair swap (key: pair+dir)
-	feePatchMap        map[common.Address]uint64 // the patch for pool fee and/or token fee
+	pairGasMap         map[string]uint64 // the gas required for a pair swap (key: pair+dir)
 	flashNokPairs      map[common.Address]uint64
 	dexPairsMap        map[common.Address]uint64 // collection of all dex pairs
 	oskLimitedPairsMap map[common.Address]struct{}
@@ -162,14 +161,12 @@ func (r *RonArbiter) ReloadLoops() {
 		log.Warn("RonFi arb ReloadLoops Reject on Trading")
 	} else {
 		r.pairGasMap = r.mysql.LoadPairGas()
-		r.feePatchMap = r.mysql.LoadFeePatch()
 		r.dexPairsMap = r.mysql.LoadDexPairs()
 		r.flashNokPairs = make(map[common.Address]uint64)
 		r.loopsMap = loops.LoadSwapLoops(
 			r.mysql,
 			r.di,
 			r.loopsIdMap,
-			r.feePatchMap,
 			r.pairGasMap,
 			r.flashNokPairs) // must be after initialization of oskLimitedPairsMap, pairGasMap, cancelLoopsMap, feePatchMap, and flashOkPairsMap
 		r.newLoopsMap = loops.NewDefaultLoopsMap() // due to all loops already saved in mysql, so after reload we don't need keep newLoopsMap.

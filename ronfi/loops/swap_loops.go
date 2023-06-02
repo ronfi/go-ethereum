@@ -262,7 +262,6 @@ func LoadSwapLoops(
 	mysql *db.Mysql,
 	di *defi.Info,
 	loopsIdMap LIdMap,
-	feePatchMap map[common.Address]uint64,
 	pairGasMap map[string]uint64,
 	flashNokPairs map[common.Address]uint64,
 ) *LMap {
@@ -289,7 +288,7 @@ func LoadSwapLoops(
 			continue
 		}
 
-		swapLoop, status := HandleSwapLoop(loop, loopsDB, allPairs, allPairsMap, uniPairsMap, allTokensMap, feePatchMap, pairGasMap, flashNokPairs, di)
+		swapLoop, status := HandleSwapLoop(loop, loopsDB, allPairs, allPairsMap, uniPairsMap, allTokensMap, pairGasMap, flashNokPairs, di)
 		if (status & Ok) != 0 {
 			totalLoopsOK++
 			if swapLoop != nil {
@@ -382,7 +381,6 @@ func HandleSwapLoop(
 	allPairsMap defi.PairInfoMap,
 	uniPairsMap defi.PairInfoMap,
 	allTokensMap map[common.Address]*defi.TokenInfo,
-	feePatchMap map[common.Address]uint64,
 	pairGasMap map[string]uint64,
 	flashNokPairs map[common.Address]uint64,
 	defiInfo *defi.Info,
@@ -460,57 +458,6 @@ func HandleSwapLoop(
 		log.Warn("RonFi LoadSwapLoops exception loops, wrong loopId", "loopId", loop.LoopId)
 		return
 	}
-
-	// Apply Fee Patches
-	patched := false
-	for i, p := range loop.Path {
-		if patch, exist := feePatchMap[p]; exist {
-			if i%2 == 0 { // token
-				if patch != swapLoop.TokenFee[i/2] {
-					swapLoop.TokenFee[i/2] = patch
-					patched = true
-				}
-			} else { // pair
-				if patch != swapLoop.PoolFee[i/2] {
-					swapLoop.PoolFee[i/2] = patch
-					patched = true
-				}
-			}
-		}
-	}
-	if patched {
-		status |= Patched
-	}
-
-	//swapLoop.Fees = make([]uint64, len(loop.PoolFee))
-	//swapLoop.RDelta = make([]float64, len(loop.PoolFee))
-	//rDeltaProd := 1.0
-	//for i := 0; i < len(loop.PoolFee); i++ {
-	//	pf := loop.PoolFee[i]
-	//	tf := loop.TokenFee[i]
-	//	if path[2*i+1] != rcommon.ZeroAddress { // normal pair
-	//		fee := pf + tf - pf*tf/10000
-	//		if fee >= 6000 { // 60% fee is impossible, sth must be wrong!
-	//			validityCheckOk = false
-	//			break
-	//		}
-	//		swapLoop.Fees[i] = fee
-	//		rDelta := 1.0 / (1.0 - float64(fee)/10000)
-	//		swapLoop.RDelta[i] = rDelta
-	//		rDeltaProd *= rDelta
-	//	} else { // fake pair as wbnb' deposit/withdraw which does not have a fee
-	//		//swapLoop.fees[i] = 0
-	//		//swapLoop.rDelta[i] = 1.0
-	//		status |= WbnbLoops
-	//		return // now we don't want these wbnb' loops
-	//	}
-	//}
-	//swapLoop.RDeltaProd = rDeltaProd // 1/d_1 * 1/d_2 * 1/d_3 * ...
-	//if !validityCheckOk {
-	//	status |= TokenFeeTooHigh
-	//	log.Warn("RonFi HandleSwapLoop exception loops, fee > 60%", "loopId", loop.LoopId)
-	//	return
-	//}
 
 	//first path is the target token
 	swapLoop.TargetToken = path[0]
