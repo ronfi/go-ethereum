@@ -2,7 +2,10 @@ package stats
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
+	"github.com/ethereum/go-ethereum/ronfi/loops"
+	"github.com/go-redis/redis"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -62,6 +65,8 @@ type Stats struct {
 
 	obsStats     ObsAllStatsMap
 	obsPairStats ObsAllPairStatsMap
+	loopsCol     *LoopsCollector
+	obsCol       *ObsCollector
 
 	pairMaxGasUsed  map[string]uint64
 	dexPairs        map[common.Address]uint64
@@ -72,6 +77,9 @@ type Stats struct {
 	prevResetTime   time.Time
 	obsMethods      map[uint64]string
 	obsRouters      map[common.Address]uint64
+
+	loopsMap   *loops.LMap
+	loopsIdMap loops.LIdMap
 }
 
 type miscStatCnt struct {
@@ -85,6 +93,10 @@ func NewStats(
 	eth rcommon.Backend,
 	client *ethclient.Client,
 	di *defi.Info,
+	redis *redis.Client,
+	mysql *db.Mysql,
+	loopsMap *loops.LMap,
+	loopsIdMap loops.LIdMap,
 	pairGasMap map[string]uint64,
 	dexPairsMap map[common.Address]uint64,
 	obsRouters map[common.Address]uint64,
@@ -142,6 +154,9 @@ func NewStats(
 	s.v3ChiBalance = balanceV3.ContractChi
 	s.v3BnbBalance = balanceV3.Eth
 
+	s.loopsMap = loopsMap
+	s.loopsIdMap = loopsIdMap
+
 	PrevBlockTargetDexTxs = make(map[uint64]TargetDexInfo)
 	PrevBlockTxs = 0
 
@@ -149,6 +164,12 @@ func NewStats(
 	s.obsPairStats.init()
 	s.obsStats = make(ObsAllStatsMap)
 	s.obsStats.init()
+
+	s.loopsCol = NewLoopsCollector(redis, mysql)
+	s.loopsCol.start()
+
+	s.obsCol = NewObsCollector(redis, mysql)
+	s.obsCol.start()
 
 	return s
 }

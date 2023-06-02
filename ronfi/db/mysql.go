@@ -1,4 +1,4 @@
-package mysql
+package db
 
 import (
 	"database/sql"
@@ -27,7 +27,6 @@ type LoopRecord struct {
 func (record *LoopRecord) ToDBLoop() *DBLoop {
 	var (
 		err       error
-		kid       int
 		key       string
 		loopId    common.Hash
 		pathArr   []string
@@ -65,10 +64,7 @@ func (record *LoopRecord) ToDBLoop() *DBLoop {
 
 	count = record.Counts
 
-	kid = -1
-
 	return &DBLoop{
-		Kid:       kid,
 		Key:       key,
 		LoopId:    loopId,
 		Path:      path,
@@ -81,7 +77,6 @@ func (record *LoopRecord) ToDBLoop() *DBLoop {
 }
 
 type DBLoop struct {
-	Kid       int // knowledge id
 	Key       string
 	LoopId    common.Hash
 	Path      []common.Address
@@ -217,9 +212,9 @@ type Mysql struct {
 
 func NewMysql(conf rcommon.MysqlConfig) *Mysql {
 	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", conf.DbUser, conf.DbPass, conf.DbHost, conf.DbPort, conf.DbData)
-	db, err := sql.Open("mysql", dbUrl)
+	db, err := sql.Open("db", dbUrl)
 	if err != nil {
-		log.Error("RonFi Mysql create mysql connection to(%s) failed!", conf.DbHost)
+		log.Error("RonFi Mysql create db connection to(%s) failed!", conf.DbHost)
 		return nil
 	}
 

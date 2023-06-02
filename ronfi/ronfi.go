@@ -2,9 +2,16 @@ package ronfi
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/ethereum/go-ethereum/common/mclock"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
+	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
+	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"github.com/ethereum/go-ethereum/ronfi/stats"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/go-redis/redis"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -46,6 +53,9 @@ type RonArbiter struct {
 	p2pHuntingTopN    int     // Control hunting on the Top N learning loops, only meaningful for p2p hunting
 	Gamma             float64 // Beta  = 0.998498873309329 // β = Sqrt( 1 - 0.3% ) = 0.998498873309329
 	// Gamma = 0.001503383459709 // γ = ( 1-β ) / β
+	loopsMap           *loops.LMap // RonFi swaploops
+	newLoopsMap        *loops.LMap // RonFi New Swap Loops, notified from obs-monitor.
+	loopsIdMap         loops.LIdMap
 	pairGasMap         map[string]uint64         // the gas required for a pair swap (key: pair+dir)
 	feePatchMap        map[common.Address]uint64 // the patch for pool fee and/or token fee
 	flashNokPairs      map[common.Address]uint64
@@ -56,11 +66,19 @@ type RonArbiter struct {
 
 	client *ethclient.Client
 
-	di *defi.Info
+	di    *defi.Info
+	rdb   *redis.Client
+	mysql *db.Mysql
 }
 
 // New Only called once when geth startup
 func New(eth rcommon.Backend, chainConfig *params.ChainConfig) *RonArbiter {
+	dbConf := rcommon.LoadDBConfig()
+	if dbConf == nil {
+		log.Error("RonFi please make sure you have a correct db_config.json")
+		return nil
+	}
+
 	r := &RonArbiter{
 		eth:             eth,
 		chainConfig:     chainConfig,
@@ -71,6 +89,16 @@ func New(eth rcommon.Backend, chainConfig *params.ChainConfig) *RonArbiter {
 		totalArb:        1,
 		maxMatchedLoops: 48,
 	}
+
+	r.mysql = db.NewMysql(dbConf.MysqlConf)
+	r.rdb = redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", dbConf.RedisConf.RedisHost, dbConf.RedisConf.RedisPort),
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	r.newLoopsMap = loops.NewDefaultLoopsMap()
+	r.loopsIdMap = make(loops.LIdMap)
 
 	go r.mainLoop()
 	return r
@@ -87,6 +115,69 @@ func (r *RonArbiter) GetDexPairs() map[common.Address]uint64 {
 func (r *RonArbiter) ResetStats() {
 	if r.stats != nil {
 		r.stats.ResetStats()
+	}
+}
+
+func (r *RonArbiter) CancelLoop(loopId string) {
+	if r.mysql != nil {
+		r.mysql.CancelLoop(common.HexToHash(loopId))
+		if r.rdb != nil {
+			startTime := mclock.Now()
+			r.rdb.Publish(rcommon.RedisMsgCancelLoop, loopId)
+			log.Info("RonFi CancelLoop", "elapsed", mclock.Since(startTime))
+		}
+	}
+}
+
+func (r *RonArbiter) RestoreLoop(loopId string) {
+	if r.mysql != nil {
+		r.mysql.RestoreLoop(common.HexToHash(loopId))
+		if r.rdb != nil {
+			startTime := mclock.Now()
+			r.rdb.Publish(rcommon.RedisMsgRestoreLoop, loopId)
+			log.Info("RonFi RestoreLoop", "elapsed", mclock.Since(startTime))
+		}
+	}
+}
+
+func (r *RonArbiter) NewObsRouter(router string, methodId uint32) {
+	log.Info("RonFi NewObsRouter", "router", router, "methodID", methodId)
+	if r.mysql != nil {
+		jsonObs := &rcommon.JsonNewObs{
+			Router:   router,
+			MethodID: methodId,
+		}
+		res := r.mysql.InsertObsRouter(jsonObs)
+		log.Info("RonFi NewObsRouter insert mysql done!", "router", router, "methodID", methodId, "res", res)
+		if res > 0 && r.rdb != nil {
+			jsonData, _ := json.Marshal(jsonObs)
+			r.rdb.Publish(rcommon.RedisMsgNewObsRouter, jsonData)
+			log.Info("RonFi NewObsRouter publish redis done!", "router", router, "methodID", methodId)
+		}
+	}
+}
+
+func (r *RonArbiter) ReloadLoops() {
+	if rpc.StartTrading {
+		log.Warn("RonFi arb ReloadLoops Reject on Trading")
+	} else {
+		r.pairGasMap = r.mysql.LoadPairGas()
+		r.feePatchMap = r.mysql.LoadFeePatch()
+		r.dexPairsMap = r.mysql.LoadDexPairs()
+		r.flashNokPairs = make(map[common.Address]uint64)
+		r.loopsMap = loops.LoadSwapLoops(
+			r.mysql,
+			r.di,
+			r.loopsIdMap,
+			r.feePatchMap,
+			r.pairGasMap,
+			r.flashNokPairs) // must be after initialization of oskLimitedPairsMap, pairGasMap, cancelLoopsMap, feePatchMap, and flashOkPairsMap
+		r.newLoopsMap = loops.NewDefaultLoopsMap() // due to all loops already saved in mysql, so after reload we don't need keep newLoopsMap.
+		r.obsRouters = r.mysql.LoadObsRouters()
+		r.obsMethods = r.mysql.LoadObsMethods()
+		//r.eth.TxPool().SetObs(r.obsRouters, r.obsMethods)
+
+		log.Info("RonFi arb Reload Loops and White Pairs success")
 	}
 }
 
@@ -150,7 +241,7 @@ func (r *RonArbiter) StartStats() {
 		return
 	}
 	// start stats service
-	r.stats = stats.NewStats(r.eth, r.client, r.di, r.GetPairGas(), r.GetDexPairs(), r.obsRouters, r.obsMethods)
+	r.stats = stats.NewStats(r.eth, r.client, r.di, r.rdb, r.mysql, r.loopsMap, r.loopsIdMap, r.GetPairGas(), r.GetDexPairs(), r.obsRouters, r.obsMethods)
 	if r.stats == nil {
 		log.Warn("RonFi stats service started failed")
 	} else {
@@ -182,7 +273,7 @@ func (r *RonArbiter) mainLoop() {
 				clientInit.Reset(ClientInitialInterval) // retry in 5 seconds
 			} else {
 				r.client = client
-				r.di = defi.NewInfo(r.client)
+				r.di = defi.NewInfo(r.client, r.mysql)
 			}
 
 		case <-oracle.C:
@@ -200,6 +291,7 @@ func (r *RonArbiter) mainLoop() {
 					log.Error("RonFi mainLoop: InitRonFiOracle() failed")
 				} else {
 					r.oracleInitialized = true
+					r.ReloadLoops()
 				}
 			}
 
@@ -210,9 +302,11 @@ func (r *RonArbiter) mainLoop() {
 			}
 
 		case <-r.startCh:
+			rpc.StartTrading = true
 			break
 
 		case <-r.stopCh:
+			rpc.StartTrading = false
 			break
 		}
 	}

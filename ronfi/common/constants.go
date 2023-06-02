@@ -9,7 +9,13 @@ const (
 	CLIENT_URL = "/home/bsc/.geth/geth.ipc"
 	CHAIN_ID   = 1
 
+	HopsMaxAllowed         = 8
 	MaxMatchedLoopsAllowed = 2
+
+	RedisMsgNewLoop      = "newLoop"
+	RedisMsgCancelLoop   = "cancelLoop"
+	RedisMsgRestoreLoop  = "restoreLoop"
+	RedisMsgNewObsRouter = "newObsRouter"
 )
 
 // internal
@@ -86,7 +92,14 @@ var (
 
 // public
 var (
+	GasRough = [9]uint64{
+		0, 100000, 150000, 210000, 280000, 350000, 420000, 500000, 600000,
+	}
+
 	ZeroAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
+
+	UniswapV3TicklensAddress = common.HexToAddress("0xbfd8137f7d1516D3ea5cA83523914859ec47F573")
+	UniswapV3FacotryAddress  = common.HexToAddress("0x1F98431c8aD98523631AE4a59f267346ea31F984")
 
 	WETH = common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 	DAI  = common.HexToAddress("0x6B175474E89094C44Da98b954EedeAC495271d0F")

@@ -11,6 +11,7 @@ import (
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/dexparser"
+	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"math/big"
 	"sort"
 	"strings"
@@ -187,6 +188,10 @@ func (s *Stats) report(header *types.Header) {
 				obsId = Obs2
 			case Obs3SwapAddr:
 				obsId = Obs3
+			case Obs4SwapAddr:
+				obsId = Obs4
+			case Obs5SwapAddr:
+				obsId = Obs5
 			default:
 				obsId = Obsx
 			}
@@ -304,6 +309,37 @@ func (s *Stats) parseObs(
 	data []byte,
 	receipt *types.Receipt) (simpleSum uint64) {
 	switch id {
+	case Obs5:
+		{
+			size := len(data)
+			if size > 69 {
+				simpleSum = simpleCheckSum(data[4:size-64]) + block // add block number to avoid duplicated on different block
+			}
+			obsLoop, dbLoop, ok := parseObs5Input(s.di, data)
+			if ok {
+				if len(receipt.Logs) > 0 { // for success arb, check which pairs are used here
+					for i := 0; i < len(dbLoop.Path); i++ {
+						pair := dbLoop.Path[i]
+						s.obsPairStats.update(id, pair)
+					}
+
+					if swapLoop, ok := s.loopsIdMap[dbLoop.LoopId]; !ok {
+						s.loopsCol.notify(dbLoop)
+						s.loopsIdMap[dbLoop.LoopId] = &loops.SwapLoop{}
+					} else {
+						swapLoop.Count++
+					}
+				}
+			}
+
+			if obsLoop != nil {
+				s.obsCol.notifyObsRecord(&ObsRecord{
+					tx,
+					id,
+					obsLoop,
+				})
+			}
+		}
 	default:
 		if len(data) > 4 {
 			simpleSum = simpleCheckSum(data[4:]) + block + binary.BigEndian.Uint64(from[12:])

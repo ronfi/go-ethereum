@@ -37,7 +37,7 @@ type RedisConfig struct {
 }
 
 type DBConfig struct {
-	MysqlConf MysqlConfig `json:"mysql"`
+	MysqlConf MysqlConfig `json:"db"`
 	RedisConf RedisConfig `json:"redis"`
 }
 

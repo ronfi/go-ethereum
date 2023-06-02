@@ -28,6 +28,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+var (
+	StartTrading = false
+)
+
 // handler handles JSON-RPC messages. There is one handler per connection. Note that
 // handler is not safe for concurrent use. Message handling never blocks indefinitely
 // because RPCs are processed on background goroutines launched by handler.

@@ -53,4 +53,8 @@ var (
 	Obs1SwapAddr = common.HexToAddress("0xc11ce44147c9f6149fbe54adb0588523c38718d7")
 	Obs2SwapAddr = common.HexToAddress("0xdB8D95f9a3180e00507c9745eEFc9287d553b481")
 	Obs3SwapAddr = common.HexToAddress("0x2d2A7d56773ae7d5c7b9f1B57f7Be05039447B4D")
+	Obs4SwapAddr = common.HexToAddress("0x0000E0Ca771e21bD00057F54A68C30D400000000")
+	Obs5SwapAddr = common.HexToAddress("0x7efd91c8ca31e7452c5c4de00a8ca1c18910a35f")
+
+	Obs5Method1 = uint32(0x007cca5a)
 )

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/contracts/contract_basev1"
 	deMax "github.com/ethereum/go-ethereum/ronfi/contracts/contract_demax"
@@ -16,6 +17,7 @@ import (
 	pancakePair "github.com/ethereum/go-ethereum/ronfi/contracts/contract_pancakepair"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
 	v3TickLens "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3ticklens"
+	"github.com/ethereum/go-ethereum/ronfi/db"
 	"math/big"
 	"sync"
 )
@@ -36,7 +38,7 @@ var (
 	Token0Id   = crypto.Keccak256([]byte("token0()"))[:4]
 )
 
-func NewInfo(client *ethclient.Client) *Info {
+func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
 	poolsInfo := make(map[common.Address]*PoolInfo)
 	pairsInfo := make(map[common.Address]*PairInfo)
 	tokensInfo := make(map[common.Address]*TokenInfo)
@@ -44,8 +46,48 @@ func NewInfo(client *ethclient.Client) *Info {
 	newPoolsInfo := make(map[common.Address]*PoolInfo)
 	newTokensInfo := make(map[common.Address]*TokenInfo)
 
+	// preload pairs info from database
+	pRecords := mysql.LoadPairsInfo()
+
+	for _, record := range pRecords {
+		pairsInfo[common.HexToAddress(record.Pair)] = &PairInfo{
+			record.Name,
+			record.Index,
+			0,
+			record.BothBriToken,
+			common.HexToAddress(record.KeyToken),
+			common.HexToAddress(record.Token0),
+			common.HexToAddress(record.Token1),
+			common.HexToAddress(record.Factory),
+		}
+	}
+	log.Info("RonFi Defi preload pairs info", "size", len(pairsInfo))
+
+	poolRecords := mysql.LoadPoolsInfo()
+	for _, record := range poolRecords {
+		poolsInfo[common.HexToAddress(record.Pool)] = &PoolInfo{
+			record.Name,
+			common.HexToAddress(record.Token0),
+			common.HexToAddress(record.Token1),
+			new(big.Int).SetInt64(int64(record.Fee)),
+			record.TickSpacing,
+		}
+	}
+	log.Info("RonFi Defi preload pools info", "size", len(poolsInfo))
+
+	// preload tokens info from database
+	tRecords := mysql.LoadTokensInfo()
+	for _, record := range tRecords {
+		tokensInfo[common.HexToAddress(record.Token)] = &TokenInfo{
+			Symbol:   record.Symbol,
+			Decimals: uint64(record.Decimals),
+		}
+	}
+	log.Info("RonFi Defi preload tokens info", "size", len(tokensInfo))
+
 	return &Info{
 		client,
+		mysql,
 
 		poolsInfo,
 		pairsInfo,

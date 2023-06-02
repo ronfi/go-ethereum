@@ -17,8 +17,11 @@
 package common
 
 import (
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // FileExist checks if a file exists at filePath.
@@ -37,4 +40,27 @@ func AbsolutePath(datadir string, filename string) string {
 		return filename
 	}
 	return filepath.Join(datadir, filename)
+}
+
+func LoadJsonFile(fileName string) ([]byte, error) {
+	if jsonFile, err := os.Open(fileName); err != nil {
+		return nil, err
+	} else {
+		defer jsonFile.Close()
+
+		if byteValue, err := ioutil.ReadAll(jsonFile); err != nil {
+			return nil, err
+		} else {
+			return byteValue, nil
+		}
+	}
+}
+
+// GetAppPath Get current Exec App path
+func GetAppPath() string {
+	file, _ := exec.LookPath(os.Args[0])
+	path, _ := filepath.Abs(file)
+	index := strings.LastIndex(path, string(os.PathSeparator))
+
+	return path[:index]
 }
