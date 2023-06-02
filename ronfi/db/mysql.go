@@ -212,7 +212,7 @@ type Mysql struct {
 
 func NewMysql(conf rcommon.MysqlConfig) *Mysql {
 	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", conf.DbUser, conf.DbPass, conf.DbHost, conf.DbPort, conf.DbData)
-	db, err := sql.Open("db", dbUrl)
+	db, err := sql.Open("mysql", dbUrl)
 	if err != nil {
 		log.Error("RonFi Mysql create db connection to(%s) failed!", conf.DbHost)
 		return nil
