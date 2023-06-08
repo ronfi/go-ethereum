@@ -258,6 +258,20 @@ func (s *Stats) obsReport(
 		}
 	}
 
+	to := tx.To()
+	if to != nil {
+		if frequency, ok := s.obsContractStats[*to]; ok {
+			s.obsContractStats[*to] = frequency + 1
+		} else {
+			s.obsContractStats[*to] = 1
+		}
+		if frequency, ok := s.obsMethodStats[methodID]; ok {
+			s.obsMethodStats[methodID] = frequency + 1
+		} else {
+			s.obsMethodStats[methodID] = 1
+		}
+	}
+
 	if !status {
 		s.obsStats.updateTotalFail(id)
 		if !isCopyHunting {
@@ -460,6 +474,54 @@ func (s *Stats) dexVolumeReport() {
 			log.Info("RonFi arb top dex pairs:", "top", index+1, "pair", info, "volume($M)", vol/1_000_000)
 		} else {
 			break
+		}
+	}
+}
+
+func (s *Stats) obsContractReport() {
+	// sort by frequency in descending
+	{
+		type kv struct {
+			Key   common.Address
+			Value uint64
+		}
+		var ss []kv
+		for k, v := range s.obsContractStats {
+			ss = append(ss, kv{k, v})
+		}
+		sort.Slice(ss, func(i, j int) bool {
+			return ss[i].Value > ss[j].Value
+		})
+
+		log.Info("RonFi arb top20 arbitrage contract:")
+		for index, v := range ss {
+			if index < 20 {
+				log.Info("RonFi arb top contract:", "top", index+1, "contract", v.Key, "txs", v.Value)
+			} else {
+				break
+			}
+		}
+	}
+	{
+		type kv struct {
+			Key   uint32
+			Value uint64
+		}
+		var ss []kv
+		for k, v := range s.obsMethodStats {
+			ss = append(ss, kv{k, v})
+		}
+		sort.Slice(ss, func(i, j int) bool {
+			return ss[i].Value > ss[j].Value
+		})
+
+		log.Info("RonFi arb top20 arbitrage method:")
+		for index, v := range ss {
+			if index < 20 {
+				log.Info("RonFi arb top method:", "top", index+1, "methodId", fmt.Sprintf("0x%08x", v.Key), "txs", v.Value)
+			} else {
+				break
+			}
 		}
 	}
 }

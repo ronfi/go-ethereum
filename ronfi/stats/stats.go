@@ -63,6 +63,9 @@ type Stats struct {
 	dexTotalFail          int
 	dexTotal              int
 
+	obsContractStats map[common.Address]uint64
+	obsMethodStats   map[uint32]uint64
+
 	obsStats     ObsAllStatsMap
 	obsPairStats ObsAllPairStatsMap
 	loopsCol     *LoopsCollector
@@ -123,6 +126,9 @@ func NewStats(
 	s.topDexPairsInfo = make(map[common.Address]DexPairInfo)
 	s.obsRouters = obsRouters
 	s.obsMethods = obsMethods
+
+	s.obsContractStats = make(map[common.Address]uint64)
+	s.obsMethodStats = make(map[uint32]uint64)
 
 	// initialize the 'pairMaxGasUsed' as the loaded 'pair_gas.json' file contents.
 	s.initialPairGasMapSize = len(pairGasMap)
@@ -233,6 +239,9 @@ func (s *Stats) Run() {
 					for _, id := range ProfitObsIds {
 						s.obsProfitReport(id)
 					}
+
+					// report obs arbitrage contract/method statistics
+					s.obsContractReport()
 
 					log.Info("RonFi arb") // splitter of profit report
 
