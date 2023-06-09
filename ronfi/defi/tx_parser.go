@@ -440,7 +440,7 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 						break
 					}
 				}
-				if k == len(pairs)-1 {
+				if len(pairs) > 1 && k == len(pairs)-1 {
 					totalProfit += di.loopProfit(pairs)
 				}
 			}
