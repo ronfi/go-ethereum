@@ -3,6 +3,8 @@ package defi
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
+	"github.com/ethereum/go-ethereum/ronfi/db"
 	"testing"
 )
 
@@ -41,7 +43,18 @@ func TestInfo_GetPairInfo(t *testing.T) {
 		}
 	}()
 
-	info := NewInfo(client)
+	conf := rcommon.MysqlConfig{
+		DbHost: "176.9.120.196",
+		DbPort: "3306",
+		DbUser: "root",
+		DbPass: "rkdb",
+		DbData: "rkdb_eth",
+	}
+	dbInst := db.NewMysql(conf)
+	if dbInst == nil {
+		t.Fatalf("TestInfo_CheckIfObs NewMysql failed!")
+	}
+	info := NewInfo(client, dbInst)
 
 	for _, tc := range tests {
 		got := info.GetPairInfo(tc.pairAddress)
@@ -67,7 +80,18 @@ func TestInfo_GetPairReserves(t *testing.T) {
 		}
 	}()
 
-	info := NewInfo(client)
+	conf := rcommon.MysqlConfig{
+		DbHost: "176.9.120.196",
+		DbPort: "3306",
+		DbUser: "root",
+		DbPass: "rkdb",
+		DbData: "rkdb_eth",
+	}
+	dbInst := db.NewMysql(conf)
+	if dbInst == nil {
+		t.Fatalf("TestInfo_CheckIfObs NewMysql failed!")
+	}
+	info := NewInfo(client, dbInst)
 
 	info.GetPairReserves(common.HexToAddress("0x63CFFc0A9E2648DeeEb9df98401B737BBd338325"))
 }

@@ -402,7 +402,7 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 						break
 					}
 				}
-				if k == len(pairs)-1 {
+				if len(pairs) > 1 && k == len(pairs)-1 {
 					isDex = false
 					isObs = true
 					return
