@@ -383,29 +383,31 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 	}
 
 	swapPairsInfo := di.ExtractSwapPairInfo(allPairsMap, nil, tx, router, vLogs, RonFiExtractTypeStats)
-	if len(swapPairsInfo) > 1 {
+	if len(swapPairsInfo) > 0 {
 		isDex = true
 		isObs = false
 
 		for i := 0; i < len(swapPairsInfo); i++ {
 			for j := i + 1; j < len(swapPairsInfo); j++ {
 				pairs := swapPairsInfo[i : j+1]
-				var k int
-				for k = 0; k < len(pairs)-1; k++ {
-					head := pairs[0]
-					prev := pairs[k]
-					next := pairs[k+1]
-					tail := next
-					if prev.To != next.Address && prev.To != *to ||
-						prev.TokenOut != next.TokenIn ||
-						head.TokenIn != tail.TokenOut {
-						break
+				if len(pairs) > 1 {
+					var k int
+					for k = 0; k < len(pairs)-1; k++ {
+						head := pairs[0]
+						prev := pairs[k]
+						next := pairs[k+1]
+						tail := next
+						if prev.To != next.Address && prev.To != *to ||
+							prev.TokenOut != next.TokenIn ||
+							head.TokenIn != tail.TokenOut {
+							break
+						}
 					}
-				}
-				if len(pairs) > 1 && k == len(pairs)-1 {
-					isDex = false
-					isObs = true
-					return
+					if k == len(pairs)-1 {
+						isDex = false
+						isObs = true
+						return
+					}
 				}
 			}
 		}
@@ -428,20 +430,22 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 		for i := 0; i < len(swapPairsInfo); i++ {
 			for j := i + 1; j < len(swapPairsInfo); j++ {
 				pairs := swapPairsInfo[i : j+1]
-				var k int
-				for k = 0; k < len(pairs)-1; k++ {
-					head := pairs[0]
-					prev := pairs[k]
-					next := pairs[k+1]
-					tail := next
-					if prev.To != next.Address && prev.To != *tx.To() ||
-						prev.TokenOut != next.TokenIn ||
-						head.TokenIn != tail.TokenOut {
-						break
+				if len(pairs) > 1 {
+					var k int
+					for k = 0; k < len(pairs)-1; k++ {
+						head := pairs[0]
+						prev := pairs[k]
+						next := pairs[k+1]
+						tail := next
+						if prev.To != next.Address && prev.To != *tx.To() ||
+							prev.TokenOut != next.TokenIn ||
+							head.TokenIn != tail.TokenOut {
+							break
+						}
 					}
-				}
-				if len(pairs) > 1 && k == len(pairs)-1 {
-					totalProfit += di.loopProfit(pairs)
+					if k == len(pairs)-1 {
+						totalProfit += di.loopProfit(pairs)
+					}
 				}
 			}
 		}
