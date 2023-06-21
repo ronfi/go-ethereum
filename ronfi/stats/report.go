@@ -433,7 +433,7 @@ func (s *Stats) pairStatsReport() {
 	// obs4
 	for _, id := range PairsObsIds {
 		switch id {
-		case Obs1, Obs3, Obs4, Obs5, Obs7:
+		case Obs1, Obs3, Obs4, Obs5, Obs6, Obs7:
 			{
 				ss := s.obsPairStats.topN(id, 20)
 				for i, pf := range ss {
@@ -461,6 +461,7 @@ func (s *Stats) pairStatsReport() {
 					countInObs1Swap := s.obsPairStats.freqInObs(Obs1, pf.Key)
 					countInObs3Swap := s.obsPairStats.freqInObs(Obs3, pf.Key)
 					countInObs5Swap := s.obsPairStats.freqInObs(Obs5, pf.Key)
+					countInObs6Swap := s.obsPairStats.freqInObs(Obs6, pf.Key)
 					countInObs7Swap := s.obsPairStats.freqInObs(Obs7, pf.Key)
 
 					log.Info("RonFi arb ron pair stats",
@@ -474,6 +475,7 @@ func (s *Stats) pairStatsReport() {
 						"obs1", countInObs1Swap,
 						"obs3", countInObs3Swap,
 						"obs5", countInObs5Swap,
+						"obs6", countInObs6Swap,
 						"obs7", countInObs7Swap)
 				}
 			}
