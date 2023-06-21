@@ -57,4 +57,5 @@ var (
 	Obs5SwapAddr = common.HexToAddress("0x7efd91c8ca31e7452c5c4de00a8ca1c18910a35f")
 
 	Obs5Method1 = uint32(0x007cca5a)
+	Obs6Method  = uint32(0x0a000000)
 )

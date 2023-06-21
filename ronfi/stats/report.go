@@ -195,6 +195,14 @@ func (s *Stats) report(header *types.Header) {
 			default:
 				obsId = Obsx
 			}
+
+			// check obs method
+			if obsId == Obsx {
+				switch methodID {
+				case Obs6Method:
+					obsId = Obs6
+				}
+			}
 			s.obsReport(obsId, number, tx, from, tx.Hash().String(), methodID, data, receipt)
 		}
 	}
@@ -330,6 +338,37 @@ func (s *Stats) parseObs(
 				simpleSum = simpleCheckSum(data[4:size-64]) + block // add block number to avoid duplicated on different block
 			}
 			obsLoop, dbLoop, ok := parseObs5Input(s.di, data)
+			if ok {
+				if len(receipt.Logs) > 0 { // for success arb, check which pairs are used here
+					for i := 0; i < len(dbLoop.Path); i++ {
+						pair := dbLoop.Path[i]
+						s.obsPairStats.update(id, pair)
+					}
+
+					if swapLoop, ok := s.loopsIdMap[dbLoop.LoopId]; !ok {
+						s.loopsCol.notify(dbLoop)
+						s.loopsIdMap[dbLoop.LoopId] = &loops.SwapLoop{}
+					} else {
+						swapLoop.Count++
+					}
+				}
+			}
+
+			if obsLoop != nil {
+				s.obsCol.notifyObsRecord(&ObsRecord{
+					tx,
+					id,
+					obsLoop,
+				})
+			}
+		}
+	case Obs6:
+		{
+			size := len(data)
+			if size == 77 {
+				simpleSum = simpleCheckSum(data[4:size-64]) + block // add block number to avoid duplicated on different block
+			}
+			obsLoop, dbLoop, ok := parseObs6Input(s.di, data)
 			if ok {
 				if len(receipt.Logs) > 0 { // for success arb, check which pairs are used here
 					for i := 0; i < len(dbLoop.Path); i++ {
