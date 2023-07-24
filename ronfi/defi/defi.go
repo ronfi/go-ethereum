@@ -61,6 +61,7 @@ func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
 			common.HexToAddress(record.Token1),
 			new(big.Int).SetInt64(int64(record.Fee)),
 			record.TickSpacing,
+			common.HexToAddress(record.Factory),
 		}
 	}
 	log.Info("RonFi Defi preload pools info", "size", len(poolsInfo))
