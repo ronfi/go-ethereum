@@ -61,18 +61,6 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 			switch topic0 {
 			case state.V2PairCreatedEvent:
 				if len(data) >= 32 && len(vlog.Topics) == 3 {
-					//token0 := common.BytesToAddress(vlog.Topics[1].Bytes())
-					//token1 := common.BytesToAddress(vlog.Topics[2].Bytes())
-					//info = GetPairInfo(&token0, &token1)
-					//switch eType {
-					//case RonFiExtractTypeStats:
-					//	//newCreatPairsMap[address] = info
-					//case RonFiExtractTypeHunting:
-					//	//if w != nil {
-					//	//	w.newPairInfo[address] = info
-					//	//}
-					//default:
-					//}
 					log.Info("RonFi extractSwapPairInfo pair created", "dexTx", tx.Hash().String(), "pair", address)
 				}
 			case state.V2SyncEvent:

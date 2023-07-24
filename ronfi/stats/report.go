@@ -148,17 +148,6 @@ func (s *Stats) report(header *types.Header) {
 				//log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
 			}
 		} else if isObs {
-			txLookup := bc.GetTransactionLookup(tx.Hash())
-			if txLookup == nil || txLookup.BlockHash != block.Hash() {
-				// maybe chain reorg
-				continue
-			}
-			if txLookup.Index >= uint64(len(receipts)) {
-				log.Error("RonFi report", "arbTx", tx.Hash().String(), "BlockIndex", txLookup.BlockIndex, "Index", txLookup.Index, "receipts", len(receipts))
-				continue
-			}
-
-			receipt := receipts[txLookup.Index]
 			from, _ := types.Sender(signer, tx)
 			number := block.NumberU64()
 
@@ -187,33 +176,33 @@ func (s *Stats) report(header *types.Header) {
 			}
 			s.obsReport(obsId, number, tx, from, tx.Hash().String(), methodID, data, receipt)
 		}
+	}
 
-		// collect 'GasUsed' for all the dex pairs in my loops json
-		if !rpc.StartTrading {
-			s.dexPairGasUsed(blockTxs, receipts, block.Hash())
+	// collect 'GasUsed' for all the dex pairs in my loops json
+	if !rpc.StartTrading {
+		s.dexPairGasUsed(blockTxs, receipts, block.Hash())
 
-			if rpc.LogPairUse {
-				rpc.LogPairUse = false
-				log.Info("RonFi arb log pair using frequency in arb tx",
-					"obs4", s.obsPairStats.count(Obs4),
-					"obs1", s.obsPairStats.count(Obs1),
-					"obs3", s.obsPairStats.count(Obs3),
-					"obs5", s.obsPairStats.count(Obs5),
-					"obs7", s.obsPairStats.count(Obs7),
-					"myself", s.obsPairStats.count(Ron))
+		if rpc.LogPairUse {
+			rpc.LogPairUse = false
+			log.Info("RonFi arb log pair using frequency in arb tx",
+				"obs4", s.obsPairStats.count(Obs4),
+				"obs1", s.obsPairStats.count(Obs1),
+				"obs3", s.obsPairStats.count(Obs3),
+				"obs5", s.obsPairStats.count(Obs5),
+				"obs7", s.obsPairStats.count(Obs7),
+				"myself", s.obsPairStats.count(Ron))
 
-				s.pairStatsReport()
-			}
+			s.pairStatsReport()
+		}
 
-			if rpc.LogPairGas {
-				rpc.LogPairGas = false
+		if rpc.LogPairGas {
+			rpc.LogPairGas = false
 
-				log.Info("RonFi log pair gasUsed", "initial", s.initialPairGasMapSize, "new", len(s.pairMaxGasUsed)-s.initialPairGasMapSize)
-				go func() {
-					s.mysql.UpdatePairGas(s.pairMaxGasUsed)
-					s.mysql.UpdateDexPairs(s.dexPairs)
-				}()
-			}
+			log.Info("RonFi log pair gasUsed", "initial", s.initialPairGasMapSize, "new", len(s.pairMaxGasUsed)-s.initialPairGasMapSize)
+			go func() {
+				s.mysql.UpdatePairGas(s.pairMaxGasUsed)
+				s.mysql.UpdateDexPairs(s.dexPairs)
+			}()
 		}
 	}
 }

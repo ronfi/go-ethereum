@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
@@ -22,10 +21,6 @@ type Protocol int
 
 const (
 	UniSwap Protocol = iota
-)
-
-var (
-	Token0Id = crypto.Keccak256([]byte("token0()"))[:4]
 )
 
 func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
@@ -243,36 +238,10 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 		return
 	}
 
-	//codeAddr := pair
-	//if target, ok := di.proxy.detectProxyTarget(pair); ok {
-	//	codeAddr = target
-	//}
-	//
-	//bytecode, err := di.client.CodeAt(context.Background(), codeAddr, nil)
-	//if err != nil || len(bytecode) <= 1 {
-	//	return
-	//}
-
-	//defiProtocol := UniSwap
-	//if bytes.Contains(bytecode, DoDoSwapId) {
-	//	defiProtocol = DodoSwap
-	//} else if bytes.Contains(bytecode, BaseV1Id) {
-	//	defiProtocol = BaseV1
-	//} else if bytes.Contains(bytecode, DeMaxId) {
-	//	defiProtocol = DeMax
-	//} else {
-	//	if !bytes.Contains(bytecode, Token0Id) {
-	//		return
-	//	}
-	//}
-
-	//switch defiProtocol {
-	//default:
 	pairInfo = di.getUniSwapPairInfo(pair)
 	if pairInfo == nil {
-		log.Warn("RonFi Defi get pair info failed", "pair", pair.Hex())
+		log.Warn("RonFi Defi get pair info failed", "pair", pair)
 	}
-	//}
 
 	di.lock.Lock()
 	if pairInfo != nil {
