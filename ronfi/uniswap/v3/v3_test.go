@@ -142,10 +142,10 @@ func TestV3_mulDiv(t *testing.T) {
 	}
 }
 
-func TestV3_Swap(t *testing.T) {
-	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/049f42c7290c310495b6940701e2ae14")
+func TestV3_CalculateTokensOutFromTokensIn(t *testing.T) {
+	client, err := ethclient.Dial("https://nd-814-711-835.p2pify.com/049f42c7290c310495b6940701e2ae14")
 	if err != nil {
-		t.Fatal("TestV3_Swap dial eth client failed!")
+		t.Fatal("TestV3_CalculateTokensOutFromTokensIn dial eth client failed!")
 	}
 
 	defer func() {
@@ -167,23 +167,113 @@ func TestV3_Swap(t *testing.T) {
 	}
 	mysqlInst := mysql.NewMysql(conf)
 	if mysqlInst == nil {
-		t.Fatalf("TestV3_Swap NewMysql failed!")
+		t.Fatalf("TestV3_CalculateTokensOutFromTokensIn NewMysql failed!")
 	}
 
 	di := defi.NewInfo(client, mysqlInst)
 	if di == nil {
-		t.Fatalf("TestV3_Swap NewInfo failed!")
+		t.Fatalf("TestV3_CalculateTokensOutFromTokensIn NewInfo failed!")
 	}
 
 	poolAddr := common.HexToAddress("0xb4E9DeA6105089f15685508B8EF2e7f7F5A1B16D")
 	TickLensAddr := common.HexToAddress("0x9a489505a00cE272eAa5e07Dba6491314CaE3796")
 
-	v3Pool := NewV3Pool(di, poolAddr, TickLensAddr, nil)
+	v3Pool := NewV3Pool(di, nil, poolAddr, TickLensAddr, nil)
 	v3Pool.UpdatePoolState(nil)
-	amountOut := v3Pool.CalculateTokensOutFromTokensIn(
+	amountOut, remaining := v3Pool.CalculateTokensOutFromTokensIn(
 		common.HexToAddress("0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"),
 		common2.StrToBigInt("100000000000000000"),
 	)
 
-	t.Logf("amountOut: %v", amountOut)
+	t.Logf("TestV3_CalculateTokensOutFromTokensIn, amountOut: %v, remaining: %v", amountOut, remaining)
+}
+
+func TestV3_CalculateTokensInFromTokensOut(t *testing.T) {
+	client, err := ethclient.Dial("https://nd-814-711-835.p2pify.com/049f42c7290c310495b6940701e2ae14")
+	if err != nil {
+		t.Fatal("TestV3_CalculateTokensInFromTokensOut dial eth client failed!")
+	}
+
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
+
+	if block, err := client.BlockNumber(context.Background()); err == nil {
+		t.Logf("block: %v\n", block)
+	}
+
+	conf := rcommon.MysqlConfig{
+		DbHost: "176.9.120.196",
+		DbPort: "3306",
+		DbUser: "root",
+		DbPass: "rkdb",
+		DbData: "rkdb",
+	}
+	mysqlInst := mysql.NewMysql(conf)
+	if mysqlInst == nil {
+		t.Fatalf("TestV3_CalculateTokensInFromTokensOut NewMysql failed!")
+	}
+
+	di := defi.NewInfo(client, mysqlInst)
+	if di == nil {
+		t.Fatalf("TestV3_CalculateTokensInFromTokensOut NewInfo failed!")
+	}
+
+	poolAddr := common.HexToAddress("0x36696169C63e42cd08ce11f5deeBbCeBae652050")
+	TickLensAddr := common.HexToAddress("0x9a489505a00cE272eAa5e07Dba6491314CaE3796")
+
+	v3Pool := NewV3Pool(di, nil, poolAddr, TickLensAddr, nil)
+	v3Pool.UpdatePoolState(nil)
+	amountIn, remaining := v3Pool.CalculateTokensInFromTokensOut(
+		common.HexToAddress("0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"),
+		common2.StrToBigInt("100000000000000000000"), // 100 BNB
+	)
+
+	t.Logf("TestV3_CalculateTokensInFromTokensOut, amountIn: %v, remaining: %v", amountIn, remaining)
+}
+
+func TestV3_MaxTokensInFromTokensOut(t *testing.T) {
+	client, err := ethclient.Dial("https://nd-814-711-835.p2pify.com/049f42c7290c310495b6940701e2ae14")
+	if err != nil {
+		t.Fatal("TestV3_MaxTokensInFromTokensOut dial eth client failed!")
+	}
+
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
+
+	if block, err := client.BlockNumber(context.Background()); err == nil {
+		t.Logf("block: %v\n", block)
+	}
+
+	conf := rcommon.MysqlConfig{
+		DbHost: "176.9.120.196",
+		DbPort: "3306",
+		DbUser: "root",
+		DbPass: "rkdb",
+		DbData: "rkdb",
+	}
+	mysqlInst := mysql.NewMysql(conf)
+	if mysqlInst == nil {
+		t.Fatalf("TestV3_MaxTokensInFromTokensOut NewMysql failed!")
+	}
+
+	di := defi.NewInfo(client, mysqlInst)
+	if di == nil {
+		t.Fatalf("TestV3_MaxTokensInFromTokensOut NewInfo failed!")
+	}
+
+	poolAddr := common.HexToAddress("0x36696169C63e42cd08ce11f5deeBbCeBae652050")
+	TickLensAddr := common.HexToAddress("0x9a489505a00cE272eAa5e07Dba6491314CaE3796")
+
+	v3Pool := NewV3Pool(di, nil, poolAddr, TickLensAddr, nil)
+	v3Pool.UpdatePoolState(nil)
+	amountIn := v3Pool.MaxTokensInFromTokensOut(
+		common.HexToAddress("0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"))
+
+	t.Logf("TestV3_MaxTokensInFromTokensOut, amountIn: %v", amountIn)
 }

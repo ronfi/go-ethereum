@@ -11,8 +11,10 @@ type MinOptions struct {
 }
 
 type MinPoint struct {
-	x   *big.Int
-	fun *big.Int
+	x          *big.Int
+	fun        *big.Int
+	amountIns  []*big.Int
+	amountOuts []*big.Int
 }
 
 func floatToInt(float *big.Float) *big.Int {
@@ -29,23 +31,38 @@ func intToFloat(integer *big.Int) *big.Float {
 
 func minimizeScalar(
 	inst interface{},
-	f func(interface{}, *big.Int) *big.Int,
+	f func(interface{}, *big.Int) (*big.Int, *big.Int, []*big.Int, []*big.Int),
 	bounds []*big.Int,
 	options *MinOptions,
-) (*MinPoint, error) {
+) (*MinPoint, int, error) {
 	// Unpack bounds
 	lower, upper := bounds[0], bounds[1]
 	a, b := intToFloat(lower), intToFloat(upper)
+	var (
+		fa, fb, fc, fd, maxB  *big.Int
+		amountIns, amountOuts []*big.Int
+	)
 
-	fa := f(inst, floatToInt(a))
-	fb := f(inst, floatToInt(b))
+	_, fa, amountIns, amountOuts = f(inst, floatToInt(a))
+	maxB, fb, amountIns, amountOuts = f(inst, floatToInt(b))
+	if maxB != nil && maxB.Cmp(lower) > 0 && maxB.Cmp(upper) < 0 {
+		b = intToFloat(maxB)
+		_, fb, amountIns, amountOuts = f(inst, floatToInt(b))
+	}
 
 	if a.Cmp(b) > 0 {
-		return nil, fmt.Errorf("lower bound must be less than upper bound")
+		return nil, 0, fmt.Errorf("lower bound must be less than upper bound")
 	}
 
 	if fa == nil || fb == nil {
-		return nil, fmt.Errorf("function must be defined on bounds")
+		return nil, 0, fmt.Errorf("function must be defined on bounds")
+	}
+
+	var min *MinPoint
+	if fa.Cmp(fb) < 0 {
+		min = &MinPoint{floatToInt(a), fa, amountIns, amountOuts}
+	} else {
+		min = &MinPoint{floatToInt(b), fb, amountIns, amountOuts}
 	}
 
 	maxIters := options.MaxIters
@@ -60,10 +77,10 @@ func minimizeScalar(
 	gap := new(big.Float).Sub(b, a)
 	c := new(big.Float).Sub(b, new(big.Float).Quo(gap, GR))
 	d := new(big.Float).Add(a, new(big.Float).Quo(gap, GR))
-	fc := f(inst, floatToInt(c))
-	fd := f(inst, floatToInt(d))
+	_, fc, amountIns, amountOuts = f(inst, floatToInt(c))
+	_, fd, amountIns, amountOuts = f(inst, floatToInt(d))
 	if fc == nil || fd == nil {
-		return nil, fmt.Errorf("function must be defined on bounds")
+		return nil, 0, fmt.Errorf("function must be defined on bounds")
 	}
 
 	iter := 0
@@ -74,9 +91,10 @@ func minimizeScalar(
 			fd = fc
 			gap = new(big.Float).Sub(b, a)
 			c = new(big.Float).Sub(b, new(big.Float).Quo(gap, GR))
-			fc = f(inst, floatToInt(c))
+			_, fc, amountIns, amountOuts = f(inst, floatToInt(c))
+			//log.Info("minimizeScalar (1)", "iter", iter, "c", floatToInt(c))
 			if fc == nil {
-				return nil, fmt.Errorf("function must be defined on bounds")
+				return nil, iter, fmt.Errorf("function must be defined on bounds")
 			}
 		} else {
 			a = c
@@ -84,25 +102,28 @@ func minimizeScalar(
 			fc = fd
 			gap = new(big.Float).Sub(b, a)
 			d = new(big.Float).Add(a, new(big.Float).Quo(gap, GR))
-			fd = f(inst, floatToInt(d))
+			_, fd, amountIns, amountOuts = f(inst, floatToInt(d))
+			//log.Info("minimizeScalar (2)", "iter", iter, "d", floatToInt(d))
 			if fd == nil {
-				return nil, fmt.Errorf("function must be defined on bounds")
+				return nil, iter, fmt.Errorf("function must be defined on bounds")
 			}
 		}
 
 		if floatToInt(c).Cmp(lower) <= 0 {
 			c = intToFloat(lower)
-			fc = f(inst, floatToInt(c))
+			_, fc, amountIns, amountOuts = f(inst, floatToInt(c))
+			//log.Info("minimizeScalar (3)", "iter", iter, "c", floatToInt(c))
 			if fc == nil {
-				return nil, fmt.Errorf("function must be defined on bounds")
+				return nil, iter, fmt.Errorf("function must be defined on bounds")
 			}
 		}
 
 		if floatToInt(d).Cmp(upper) >= 0 {
 			d = intToFloat(upper)
-			fd = f(inst, floatToInt(d))
+			_, fd, amountIns, amountOuts = f(inst, floatToInt(d))
+			//log.Info("minimizeScalar (4)", "iter", iter, "d", floatToInt(d))
 			if fd == nil {
-				return nil, fmt.Errorf("function must be defined on bounds")
+				return nil, iter, fmt.Errorf("function must be defined on bounds")
 			}
 		}
 
@@ -110,10 +131,16 @@ func minimizeScalar(
 	}
 
 	if fc.Cmp(fd) <= 0 {
-		return &MinPoint{floatToInt(c), fc}, nil
+		if fc.Cmp(min.fun) < 0 {
+			min = &MinPoint{floatToInt(c), fc, amountIns, amountOuts}
+		}
 	} else {
-		return &MinPoint{floatToInt(d), fd}, nil
+		if fd.Cmp(min.fun) < 0 {
+			min = &MinPoint{floatToInt(d), fd, amountIns, amountOuts}
+		}
 	}
+
+	return min, iter, nil
 }
 
 func gradientApproximation(

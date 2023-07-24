@@ -37,7 +37,7 @@ func getStorageSlotIndex(key int64, mappingSlotIndex *big.Int) []byte {
 	}
 
 	// ABI encoding of the input data
-	packedData, err := args.Pack(big.NewInt(int64(key)), mappingSlotIndex)
+	packedData, err := args.Pack(big.NewInt(key), mappingSlotIndex)
 	if err != nil {
 		log.Error("RonFi getStorageSlotIndex", "err", err)
 		return []byte{}

@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/dexparser"
 	"github.com/ethereum/go-ethereum/ronfi/loops"
+	"github.com/ethereum/go-ethereum/rpc"
 	"math/big"
 	"sort"
 	"strings"
@@ -30,9 +30,8 @@ type DexPairInfo struct {
 
 const maxLenCheckSum = 256 // Circular Buffer for Input Data Checksum
 var (
-	PrevBlockTargetDexTxs = map[uint64]TargetDexInfo{}
-	PrevBlockTxs          int
-	Gap0ToStats           = map[string]int{}
+	PrevBlockTxs int
+	Gap0ToStats  = map[string]int{}
 
 	MyInputCheckSums = [maxLenCheckSum]uint64{}
 	MyIndexCheckSums = 0
@@ -41,6 +40,11 @@ var (
 )
 
 func (s *Stats) report(header *types.Header) {
+	var (
+		methodID  uint32
+		shortHash uint64
+	)
+
 	bc := s.chain
 	if bc == nil {
 		log.Error("RonFi Stats report: chain issue, bc == nil")
@@ -56,55 +60,10 @@ func (s *Stats) report(header *types.Header) {
 
 	receipts := bc.GetReceiptsByHash(block.Hash())
 	signer := types.MakeSigner(s.chain.Config(), header.Number, header.Time)
-	var methodID uint32
 	blockTxs := block.Transactions()
-	TargetDexTxs := make(map[uint64]TargetDexInfo, len(blockTxs))
 	defer func() {
-		PrevBlockTargetDexTxs = TargetDexTxs
 		PrevBlockTxs = len(blockTxs)
 	}()
-
-	// pre-processing first, to collect the dex txs short hash
-	for _, tx := range blockTxs {
-		to := tx.To()
-		data := tx.Data()
-		if to == nil || len(data) == 0 {
-			continue
-		}
-		if len(data) >= 4 {
-			methodID = binary.BigEndian.Uint32(tx.Data()[:4])
-		} else {
-			methodID = 0
-		}
-
-		if _, ok := dexparser.ParsableDexMethods[methodID]; ok {
-			txLookup := bc.GetTransactionLookup(tx.Hash())
-			if txLookup == nil || txLookup.BlockHash != block.Hash() {
-				// maybe chain reorg
-				continue
-			}
-		}
-	}
-
-	// pre-processing, find out all target dex txs index. If a target missing, it could have been overwritten and not on chain anymore!
-	for _, tx := range blockTxs {
-		dexTxId := tx.Hash().Uint64()
-		if info, exist := TargetDexTxs[dexTxId]; exist {
-			txLookup := bc.GetTransactionLookup(tx.Hash())
-			if txLookup == nil || txLookup.BlockHash != block.Hash() {
-				// maybe chain reorg
-				continue
-			}
-			info.Index = int(txLookup.Index)
-			if txLookup.Index < uint64(len(receipts)) {
-				if receipt := receipts[txLookup.Index]; receipt.Status == 1 {
-					info.Success = true
-				}
-			}
-
-			TargetDexTxs[dexTxId] = info
-		}
-	}
 
 	for _, tx := range blockTxs {
 		to := tx.To()
@@ -112,6 +71,7 @@ func (s *Stats) report(header *types.Header) {
 			continue
 		}
 
+		shortHash = tx.Hash().Uint64()
 		data := tx.Data()
 		if len(data) >= 4 {
 			methodID = binary.BigEndian.Uint32(tx.Data()[:4])
@@ -176,9 +136,31 @@ func (s *Stats) report(header *types.Header) {
 					}
 				}
 			}
+
+			if !rpc.AllIngressTxs.Has(shortHash) {
+				// found missed dex txs from open tx pool
+				s.missedTxCount++
+				txLookup := bc.GetTransactionLookup(tx.Hash())
+				if txLookup == nil || txLookup.BlockHash != block.Hash() {
+					// maybe chain reorg
+					continue
+				}
+				//log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
+			}
 		} else if isObs {
-			number := block.NumberU64()
+			txLookup := bc.GetTransactionLookup(tx.Hash())
+			if txLookup == nil || txLookup.BlockHash != block.Hash() {
+				// maybe chain reorg
+				continue
+			}
+			if txLookup.Index >= uint64(len(receipts)) {
+				log.Error("RonFi report", "arbTx", tx.Hash().String(), "BlockIndex", txLookup.BlockIndex, "Index", txLookup.Index, "receipts", len(receipts))
+				continue
+			}
+
+			receipt := receipts[txLookup.Index]
 			from, _ := types.Sender(signer, tx)
+			number := block.NumberU64()
 
 			var obsId ObsId
 			switch *to {
@@ -204,6 +186,34 @@ func (s *Stats) report(header *types.Header) {
 				}
 			}
 			s.obsReport(obsId, number, tx, from, tx.Hash().String(), methodID, data, receipt)
+		}
+
+		// collect 'GasUsed' for all the dex pairs in my loops json
+		if !rpc.StartTrading {
+			s.dexPairGasUsed(blockTxs, receipts, block.Hash())
+
+			if rpc.LogPairUse {
+				rpc.LogPairUse = false
+				log.Info("RonFi arb log pair using frequency in arb tx",
+					"obs4", s.obsPairStats.count(Obs4),
+					"obs1", s.obsPairStats.count(Obs1),
+					"obs3", s.obsPairStats.count(Obs3),
+					"obs5", s.obsPairStats.count(Obs5),
+					"obs7", s.obsPairStats.count(Obs7),
+					"myself", s.obsPairStats.count(Ron))
+
+				s.pairStatsReport()
+			}
+
+			if rpc.LogPairGas {
+				rpc.LogPairGas = false
+
+				log.Info("RonFi log pair gasUsed", "initial", s.initialPairGasMapSize, "new", len(s.pairMaxGasUsed)-s.initialPairGasMapSize)
+				go func() {
+					s.mysql.UpdatePairGas(s.pairMaxGasUsed)
+					s.mysql.UpdateDexPairs(s.dexPairs)
+				}()
+			}
 		}
 	}
 }

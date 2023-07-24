@@ -16,7 +16,7 @@ var (
 )
 
 // ProfitSince calculate (gross, net) profit since last balance
-func (b *RonBalance) ProfitSince(previous *RonBalance, shortFee float64) (float64, float64) {
+func (b *RonFiBalance) ProfitSince(previous *RonFiBalance, shortFee float64) (float64, float64) {
 	cost := (previous.Eth - b.Eth + shortFee) * GetTradingTokenPrice(rcommon.USDC) // cost in USD
 
 	gross := b.ContractEth - previous.ContractEth
@@ -101,8 +101,8 @@ func (di *Info) ronTokensBalance(token common.Address, v3 bool) *big.Int {
 	return nil
 }
 
-func (di *Info) GetAllBalance(executors []common.Address, v3 bool) RonBalance {
-	ronBalance := RonBalance{}
+func (di *Info) GetAllBalance(executors []common.Address, v3 bool) RonFiBalance {
+	ronBalance := RonFiBalance{}
 
 	return ronBalance
 }

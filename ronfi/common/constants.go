@@ -12,10 +12,14 @@ const (
 	HopsMaxAllowed         = 8
 	MaxMatchedLoopsAllowed = 2
 
-	RedisMsgNewLoop      = "newLoop"
-	RedisMsgCancelLoop   = "cancelLoop"
-	RedisMsgRestoreLoop  = "restoreLoop"
-	RedisMsgNewObsRouter = "newObsRouter"
+	RedisMsgNewLoop         = "newLoop"
+	RedisMsgNewKnowledge    = "newKnowledge"
+	RedisMsgCancelLoop      = "cancelLoop"
+	RedisMsgRestoreLoop     = "restoreLoop"
+	RedisMsgCancelKnowledge = "cancelKnowledge"
+	RedisMsgNewObsRouter    = "newObsRouter"
+	RedisMsgNewDexRouter    = "newDexRouter"
+	RedisMsgDelDexRouter    = "delDexRouter"
 )
 
 // internal
@@ -122,46 +126,5 @@ var (
 		USDT: {},
 		WETH: {},
 		BTCB: {},
-	}
-
-	DexMethodsTypical = map[uint64]string{
-		0x38ed1739: "swapExactTokensForTokens", // amountIn fixed
-		0x5c11d795: "swapExactTokensForTokensSupportingFeeOnTransferTokens",
-		0x7ff36ab5: "swapExactETHForTokens", // amountIn fixed,	ETH -> TOK
-		0xb6f9de95: "swapExactETHForTokensSupportingFeeOnTransferTokens",
-		0x9cf68911: "swapExactBNBForTokens", // amountIn fixed
-		0x18cbafe5: "swapExactTokensForETH", // amountIn fixed,	TOK -> ETH
-		0x791ac947: "swapExactTokensForETHSupportingFeeOnTransferTokens",
-		0x5d616c5b: "swapExactTokensForBNB", // amountIn fixed,	TOK -> BNB
-		0xd46d2f83: "swapExactTokensForBNBSupportingFeeOnTransferTokens",
-		0x8803dbee: "swapTokensForExactTokens", // amountOut fixed
-		0x4a25d94a: "swapTokensForExactETH",    // amountOut fixed,	TOK -> ETH
-		0xfb3bdb41: "swapETHForExactTokens",    // amountOut fixed,	ETH -> TOK
-		0x8332a963: "swapBNBForExactTokens",    // amountOut fixed
-		0xd67b571e: "swapTokensForExactBNB",    // amountOut fixed,   TOK -> BNB
-		0xe8e33700: "addLiquidity",             //(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline)
-		0x57528cca: "addLiquidity",             //(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline, uint256 startingSwapTime)
-		0xf305d719: "addLiquidityETH",
-		0x6bb6a6f6: "addLiquidityETH", //(address token, uint256 amountTokenDesired, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline, uint256 startingSwapTime)
-		0xeaaed442: "addLiquidityBNB", //(address token, uint256 amountTokenDesired, uint256 amountTokenMin, uint256 amountBNBMin, address to, uint256 deadline)
-		0xbaa2abde: "removeLiquidity",
-		0x2195995c: "removeLiquidityWithPermit",
-		0x02751cec: "removeLiquidityETH",
-		0xaf2979eb: "removeLiquidityETHSupportingFeeOnTransferTokens",
-		0xded9382a: "removeLiquidityETHWithPermit",
-		0x5b0d5984: "removeLiquidityETHWithPermitSupportingFeeOnTransferTokens",
-		0xe0588488: "removeLiquidityBNB",
-		0x34a0772d: "removeLiquidityBNBWithPermit",
-		0x685a0a34: "removeLiquidityBNBWithPermitSupportingFeeOnTransferTokens", //(address token, uint256 liquidity, uint256 amountTokenMin, uint256 amountBNBMin, address to, uint256 deadline, bool approveMax, uint8 v, bytes32 r, bytes32 s)
-		0x5f575529: "metamask swap",                                             // Function: swap(bytes data)  MetaMask also use it
-		0x7c025200: "1inch",
-		0x2e95b6c8: "1inch",
-		0xcba9bc66: "Agg1Router",
-		0x415565b0: "ZeroEx",
-		0xc43c9ef6: "ZeroEx",
-		0x441a3e70: "Withdraw", //PlanetFinance
-		0xe2bbb158: "Deposit",  //PlanetFinance
-		0xd72ef771: "work",     // AdminUpgradeabilityProxy
-		0xd29a0025: "Kill",     // AdminUpgradeabilityProxy
 	}
 )

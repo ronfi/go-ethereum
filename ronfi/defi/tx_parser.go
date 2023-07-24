@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
 	"math/big"
@@ -15,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-type SyncPairInfo struct {
+type V2SyncInfo struct {
 	address  common.Address
 	reserve0 *big.Int
 	reserve1 *big.Int
@@ -30,7 +31,7 @@ const (
 )
 
 func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInfoMap, tx *types.Transaction, router common.Address, vLogs []*types.Log, eType RonFiExtractType) []*SwapPairInfo {
-	var syncPairInfo *SyncPairInfo // there must have a 'sync' event before any 'swap'/'mint'/'burn' event.
+	var syncPairInfo *V2SyncInfo // there must have a 'sync' event before any 'swap'/'mint'/'burn' event.
 
 	swapPairsInfo := make([]*SwapPairInfo, 0, len(vLogs)/2)
 
@@ -76,7 +77,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 				}
 			case state.V2SyncEvent:
 				if len(data) == 64 && eType == RonFiExtractTypeHunting {
-					syncPairInfo = &SyncPairInfo{
+					syncPairInfo = &V2SyncInfo{
 						address,
 						new(big.Int).SetBytes(data[18:32]), // 112 bits = 14 bytes, 32-14=18
 						new(big.Int).SetBytes(data[50:64]), // 64-14=50
@@ -370,6 +371,12 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 	to := tx.To()
 	if to == nil {
 		return
+	} else {
+		if txpool.ObsRouters != nil {
+			if _, isObs = txpool.ObsRouters[*to]; isObs {
+				return
+			}
+		}
 	}
 
 	data := tx.Data()
@@ -378,7 +385,9 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 	}
 
 	methodID := uint64(binary.BigEndian.Uint32(data[:4]))
-	if _, ok := rcommon.DexMethodsTypical[methodID]; ok {
+	if _, isDex = txpool.DexMethodsTypical[methodID]; isDex {
+		return
+	} else if _, isObs = txpool.ObsMethods[methodID]; isObs {
 		return
 	}
 

@@ -93,5 +93,10 @@ func TestInfo_GetPairReserves(t *testing.T) {
 	}
 	info := NewInfo(client, dbInst)
 
-	info.GetPairReserves(common.HexToAddress("0x63CFFc0A9E2648DeeEb9df98401B737BBd338325"))
+	resv := info.GetPairReserves(common.HexToAddress("0x63CFFc0A9E2648DeeEb9df98401B737BBd338325"))
+	if resv == nil {
+		t.Fatalf("TestInfo_GetPairReserves getPairReserves failed!")
+	} else {
+		t.Logf("TestInfo_GetPairReserves reserve0: %v, reserve1: %v, timeStamp: %v", resv.Reserve0, resv.Reserve1, resv.Timestamp)
+	}
 }

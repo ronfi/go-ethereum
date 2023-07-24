@@ -17,9 +17,9 @@ type TaggedEdge struct {
 }
 
 func (t *TaggedEdge) ID() string {
-	if t.PoolType == UniswapV2 {
+	if t.PoolType == V2 {
 		return fmt.Sprintf("%s-%d-v2", t.Pair, t.Dir)
-	} else if t.PoolType == UniswapV3 {
+	} else if t.PoolType == V3 {
 		return fmt.Sprintf("%s-%d-v3", t.Pair, t.Dir)
 	} else {
 		return fmt.Sprintf("%s-%d-unknown", t.Pair, t.Dir)
@@ -75,7 +75,7 @@ func (c *Cycle) CheckIfV3OnHeadTail() bool {
 
 	edgeH := (*c)[0]
 	edgeT := (*c)[len(*c)-1]
-	if edgeH.Tag.PoolType == UniswapV3 && edgeT.Tag.PoolType == UniswapV3 {
+	if edgeH.Tag.PoolType == V3 && edgeT.Tag.PoolType == V3 {
 		return true
 	}
 
@@ -205,7 +205,7 @@ func NewV3Loops(
 		g.AddEdge(&Edge{Source: info.Token0, Target: info.Token1, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      0,
-			PoolType: UniswapV2,
+			PoolType: V2,
 			GasNeed:  gasNeed,
 		}})
 
@@ -220,7 +220,7 @@ func NewV3Loops(
 		g.AddEdge(&Edge{Source: info.Token1, Target: info.Token0, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      1,
-			PoolType: UniswapV2,
+			PoolType: V2,
 			GasNeed:  gasNeed,
 		}})
 	}
@@ -237,7 +237,7 @@ func NewV3Loops(
 		g.AddEdge(&Edge{Source: info.Token0, Target: info.Token1, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      0,
-			PoolType: UniswapV3,
+			PoolType: V3,
 			GasNeed:  gasNeed,
 		}})
 		key = fmt.Sprintf("%s-%d", addr, 1)
@@ -251,7 +251,7 @@ func NewV3Loops(
 		g.AddEdge(&Edge{Source: info.Token1, Target: info.Token0, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      1,
-			PoolType: UniswapV3,
+			PoolType: V3,
 			GasNeed:  gasNeed,
 		}})
 	}
@@ -298,7 +298,7 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 			} else {
 				tokenFee = int(v.tokensInfo[edge.Target].Fee)
 			}
-			if edge.Tag.PoolType == UniswapV2 {
+			if edge.Tag.PoolType == V2 {
 				poolFee := 30
 				if v.pairsInfo[edge.Tag.Pair] == nil {
 					log.Info("RonFi V3Loops", "unKnown v2 pair", edge.Tag.Pair)
@@ -307,9 +307,9 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 				} else {
 					poolFee = int(v.pairsInfo[edge.Tag.Pair].Fee)
 				}
-				path = append(path, &UniswapPool{
+				path = append(path, &Pool{
 					PoolAddr: edge.Tag.Pair,
-					PoolType: UniswapV2,
+					PoolType: V2,
 					PoolFee:  poolFee,
 					TokenFee: tokenFee,
 					TickLens: rcommon.ZeroAddress,
@@ -317,10 +317,10 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 					Dir:      edge.Tag.Dir,
 					GasNeed:  edge.Tag.GasNeed,
 				})
-			} else if edge.Tag.PoolType == UniswapV3 {
-				path = append(path, &UniswapPool{
+			} else if edge.Tag.PoolType == V3 {
+				path = append(path, &Pool{
 					PoolAddr: edge.Tag.Pair,
-					PoolType: UniswapV3,
+					PoolType: V3,
 					PoolFee:  0,
 					TokenFee: tokenFee,
 					TickLens: rcommon.UniswapV3TicklensAddress,

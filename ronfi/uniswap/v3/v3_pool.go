@@ -1,8 +1,10 @@
 package v3
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -15,17 +17,29 @@ type TickData struct {
 	liquidityNet   *big.Int
 }
 
-type V3Pool struct {
-	di         *defi.Info
-	tx         *types.Transaction
-	statedb    *state.StateDB
-	tickLens   common.Address
-	tickData   map[int]*TickData
-	tickBitMap TickBitMap
-	Address    common.Address
-	PoolInfo   *defi.PoolInfo
-	Name       string
-	State      *PoolState
+type DetailOut struct {
+	AmountOut         *big.Int
+	AmountInRemaining *big.Int
+	MaxIn             *big.Int
+}
+
+type MaxSwapStepState struct {
+	maxAmountIn  *big.Int
+	stepStateMap *SwapStepState
+}
+
+type Pool struct {
+	di           *defi.Info
+	tx           *types.Transaction
+	statedb      *state.StateDB
+	tickLens     common.Address
+	tickData     map[int]*TickData
+	tickBitMap   TickBitMap
+	Address      common.Address
+	PoolInfo     *defi.PoolInfo
+	Name         string
+	State        *PoolState
+	stepStateMap map[string]*MaxSwapStepState
 }
 
 type StepState struct {
@@ -60,7 +74,7 @@ type PoolState struct {
 	Liquidity    *big.Int
 }
 
-func NewV3Pool(di *defi.Info, tx *types.Transaction, address common.Address, tickLens common.Address, statedb *state.StateDB) *V3Pool {
+func NewV3Pool(di *defi.Info, tx *types.Transaction, address common.Address, tickLens common.Address, statedb *state.StateDB) *Pool {
 	if di == nil {
 		log.Warn("RonFi NewV3Pool di is nil")
 		return nil
@@ -68,7 +82,7 @@ func NewV3Pool(di *defi.Info, tx *types.Transaction, address common.Address, tic
 
 	poolInfo := di.GetPoolInfo(address)
 	if poolInfo == nil {
-		log.Warn("RonFi NewV3Pool PoolInfo is nil")
+		log.Warn("RonFi NewV3Pool PoolInfo is nil", "address", address)
 		return nil
 	}
 
@@ -78,16 +92,18 @@ func NewV3Pool(di *defi.Info, tx *types.Transaction, address common.Address, tic
 
 	tickBitMap := make(TickBitMap)
 	tickData := make(map[int]*TickData)
-	v3Pool := &V3Pool{
-		di:         di,
-		tx:         tx,
-		statedb:    statedb,
-		Address:    address,
-		PoolInfo:   poolInfo,
-		Name:       name,
-		tickLens:   tickLens,
-		tickBitMap: tickBitMap,
-		tickData:   tickData,
+	stepStateMap := make(map[string]*MaxSwapStepState)
+	v3Pool := &Pool{
+		di:           di,
+		tx:           tx,
+		statedb:      statedb,
+		Address:      address,
+		PoolInfo:     poolInfo,
+		Name:         name,
+		tickLens:     tickLens,
+		tickBitMap:   tickBitMap,
+		tickData:     tickData,
+		stepStateMap: stepStateMap,
 	}
 
 	return v3Pool
@@ -103,7 +119,7 @@ func toInt24(n uint32) int32 {
 	return int32(n)
 }
 
-func (p *V3Pool) Dump() {
+func (p *Pool) Dump() {
 	log.Info("RonFi V3Pool Dump:", "tx", p.tx.Hash().String(), "pool", p.Address)
 	for k, v := range p.tickBitMap {
 		log.Info("RonFi V3Pool",
@@ -121,155 +137,167 @@ func (p *V3Pool) Dump() {
 	}
 }
 
-func (p *V3Pool) updateTickDataAtWord(wordPos int16) {
+func (p *Pool) updateTickBitmapAtWord(wordPos int16) {
 	if _, ok := p.tickBitMap[wordPos]; ok {
+		//log.Info("updateTickBitmapAtWord matched ok", "wordPos", wordPos, "bitmap", fmt.Sprintf("%x", bitmap))
 		return
 	}
 
 	if p.statedb != nil {
 		tickBitmapSt := p.statedb.GetState(p.Address, common.BytesToHash(getStorageSlotIndex(int64(wordPos), big.NewInt(7))))
 		singleTickBitmap := new(big.Int).SetBytes(tickBitmapSt.Bytes())
-		if singleTickBitmap.Cmp(ZERO) != 0 {
-			for i := int64(0); i < 256; i++ {
-				if new(big.Int).And(singleTickBitmap, new(big.Int).Lsh(big.NewInt(1), uint(i))).Cmp(ZERO) > 0 {
-					populatedTick := toInt24(uint32((toInt24(uint32(int64(wordPos)<<8 + i))) * toInt24(uint32(p.PoolInfo.TickSpacing))))
-					singleTickData := p.statedb.GetState(p.Address, common.BytesToHash(getStorageSlotIndex(int64(populatedTick), big.NewInt(6))))
-					liquidityNet := new(big.Int).SetBytes(singleTickData.Bytes()[:16])
-					if liquidityNet.BitLen() == 128 && liquidityNet.Bit(127) == 1 {
-						// Create a 128-bit mask
-						mask := new(big.Int).Exp(big.NewInt(2), big.NewInt(128), nil)
-
-						// Perform two's complement to get the negative value
-						liquidityNet.Sub(mask, liquidityNet)
-						liquidityNet.Neg(liquidityNet)
-					}
-					liquidityGross := new(big.Int).SetBytes(singleTickData.Bytes()[16:])
-					p.tickData[int(populatedTick)] = &TickData{
-						liquidityGross,
-						liquidityNet,
-					}
-				}
-			}
-
-			//singleTickBitmapCntr, err := p.di.GetV3TickBitMap(p.Address, wordPos)
-			//if err == nil && singleTickBitmap.Cmp(singleTickBitmapCntr) != 0 {
-			//	log.Info("RonFi updateTickDataAtWord, different singleTickBitmap",
-			//		"pool", p.Address,
-			//		"wordPos", wordPos,
-			//		"singleTickBitmap", singleTickBitmap,
-			//		"singleTickBitmapCntr", singleTickBitmapCntr)
-			//}
-			//if singleTickData, err := p.di.GetV3PopulatedTicksInWord(p.tickLens, p.Address, wordPos); err != nil {
-			//	log.Warn("RonFi updateTickDataAtWord", "pool", p.Address, "err", err)
-			//	return
-			//} else {
-			//	for _, data := range singleTickData {
-			//		org, ok := p.tickData[int(data.Tick.Int64())]
-			//		if !ok || org.liquidityNet.Cmp(data.LiquidityNet) != 0 ||
-			//			org.liquidityGross.Cmp(data.LiquidityGross) != 0 {
-			//			log.Warn("RonFi updateTickDataAtWord, different tick data",
-			//				"singleTickBitmap", singleTickBitmap,
-			//				"singleTickBitmapCntr", singleTickBitmapCntr,
-			//				"tick", data.Tick.Int64(),
-			//				"org.liquidityNet", org.liquidityNet,
-			//				"data.LiquidityNet", data.LiquidityNet,
-			//				"org.liquidityGross", org.liquidityGross,
-			//				"data.LiquidityGross", data.LiquidityGross)
-			//		}
-			//
-			//	}
-			//}
-
-			p.tickBitMap[wordPos] = singleTickBitmap
-		}
+		p.tickBitMap[wordPos] = singleTickBitmap
+		//log.Info("updateTickBitmapAtWord matched nok", "wordPos", wordPos, "bitmap", fmt.Sprintf("%x", singleTickBitmap))
 	} else {
+		// this is only used for unit test
+		log.Warn("RonFi v3 updateTickBitmapAtWord, statedb is nil, use di instead (unit test only)")
 		if singleTickBitmap, err := p.di.GetV3TickBitMap(p.Address, wordPos); err != nil {
-			log.Warn("RonFi updateTickDataAtWord", "pool", p.Address, "err", err)
+			log.Warn("RonFi updateTickBitmapAtWord", "pool", p.Address, "err", err)
 			return
 		} else {
 			if singleTickBitmap == nil {
 				return
 			}
-
-			if singleTickBitmap.Cmp(ZERO) != 0 {
-				if singleTickData, err := p.di.GetV3PopulatedTicksInWord(p.tickLens, p.Address, wordPos); err != nil {
-					log.Warn("RonFi updateTickDataAtWord", "pool", p.Address, "err", err)
-					return
-				} else {
-					for _, data := range singleTickData {
-						p.tickData[int(data.Tick.Int64())] = &TickData{
-							liquidityGross: data.LiquidityGross,
-							liquidityNet:   data.LiquidityNet,
-						}
-					}
-				}
-			}
-
 			p.tickBitMap[wordPos] = singleTickBitmap
 		}
 	}
 }
 
-type V3PoolState struct {
-	Tick         int
-	SqrtPriceX96 *big.Int
-	Liquidity    *big.Int
+func (p *Pool) getTickData(populatedTick int) *TickData {
+	if tickData, ok := p.tickData[populatedTick]; ok {
+		//log.Info("getTickData matched ok", "tick", populatedTick)
+		return tickData
+	}
+
+	if p.statedb != nil {
+		singleTickData := p.statedb.GetState(p.Address, common.BytesToHash(getStorageSlotIndex(int64(populatedTick), big.NewInt(6))))
+		liquidityNet := new(big.Int).SetBytes(singleTickData.Bytes()[:16])
+		if liquidityNet.BitLen() == 128 && liquidityNet.Bit(127) == 1 {
+			// Create a 128-bit mask
+			mask := new(big.Int).Lsh(big.NewInt(1), 128)
+
+			// Perform two's complement to get the negative value
+			liquidityNet.Sub(mask, liquidityNet)
+			liquidityNet.Neg(liquidityNet)
+		}
+		liquidityGross := new(big.Int).SetBytes(singleTickData.Bytes()[16:])
+		tickData := &TickData{
+			liquidityGross,
+			liquidityNet,
+		}
+		p.tickData[populatedTick] = tickData
+		//log.Info("getTickData matched nok", "tick", populatedTick)
+		return tickData
+	} else {
+		// this is only used for unit test
+		log.Warn("RonFi v3 getTickData, statedb is nil, use di instead (unit test only)")
+
+		wordPos, _ := position(populatedTick / int(p.PoolInfo.TickSpacing))
+		if singleTickData, err := p.di.GetV3PopulatedTicksInWord(p.tickLens, p.Address, wordPos); err != nil {
+			log.Warn("RonFi updateTickDataAtWord", "pool", p.Address, "err", err)
+			return nil
+		} else {
+			for _, data := range singleTickData {
+				p.tickData[int(data.Tick.Int64())] = &TickData{
+					liquidityGross: data.LiquidityGross,
+					liquidityNet:   data.LiquidityNet,
+				}
+			}
+		}
+		if tickData, ok := p.tickData[populatedTick]; ok {
+			return tickData
+		} else {
+			return nil
+		}
+	}
 }
 
-func (p *V3Pool) UpdatePoolState(v3States *V3PoolState) bool {
-	//defer func() {
-	//	fmt.Printf("Name: %v\n", p.Name)
-	//	fmt.Printf("Token0: %v\n", p.PoolInfo.Token0)
-	//	fmt.Printf("Token1: %v\n", p.PoolInfo.Token1)
-	//	fmt.Printf("Liquidity: %v\n", p.State.Liquidity)
-	//	fmt.Printf("SqrtPriceX96: %v\n", p.State.SqrtPriceX96)
-	//	fmt.Printf("Tick: %v\n", p.State.Tick)
-	//}()
-
+func (p *Pool) UpdatePoolState(v3States *PoolState) bool {
 	if v3States != nil {
+		// compare new 'liquidity' with 'old' one, reset maps if not same
+		if p.State == nil {
+			p.tickData = make(map[int]*TickData)
+			p.tickBitMap = make(map[int16]*big.Int)
+		}
+
 		p.State = &PoolState{
 			Tick:         v3States.Tick,
 			SqrtPriceX96: v3States.SqrtPriceX96,
 			Liquidity:    v3States.Liquidity,
 		}
-		return true
 	} else {
-		var err error
 		p.PoolInfo = p.di.GetPoolInfo(p.Address)
-		liquidity, err := p.di.GetV3CurrentLiquidity(p.Address)
-		if err != nil {
-			log.Warn("RonFi updatePoolState", "address", p.Address, "err", err)
-			return false
-		}
+		if p.statedb != nil {
+			liquidity := new(big.Int).SetBytes(p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(5))).Bytes())
+			if liquidity.BitLen() == 0 {
+				//log.Warn("updatePoolState: liquidity is 0", "pool", p.Address.HexNoChecksum())
+				return false
+			}
 
-		sqrtPriceX96, err := p.di.GetV3SqrtPriceX96(p.Address)
-		if err != nil {
-			log.Warn("RonFi updatePoolState", "address", p.Address, "err", err)
-			return false
-		}
-		tick, err := p.di.GetV3CurrentTick(p.Address)
-		if err != nil {
-			log.Warn("RonFi updatePoolState", "address", p.Address, "err", err)
-			return false
-		}
+			slot0Hash := p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(0)))
+			if slot0Hash == (common.Hash{}) {
+				//log.Warn("updatePoolState: slot0Hash is 0", "pool", p.Address.HexNoChecksum())
+				return false
+			}
+			slot0 := slot0Hash.Bytes()
+			sqrtPriceX96 := new(big.Int).SetBytes(slot0[12:32])
+			tick := int32(binary.BigEndian.Uint32(slot0[9:13])) >> 8
 
-		p.State = &PoolState{
-			Tick:         tick,
-			SqrtPriceX96: sqrtPriceX96,
-			Liquidity:    liquidity,
-		}
+			if p.State == nil {
+				p.tickData = make(map[int]*TickData)
+				p.tickBitMap = make(map[int16]*big.Int)
+			}
 
-		return true
+			p.State = &PoolState{
+				Tick:         int(tick),
+				SqrtPriceX96: sqrtPriceX96,
+				Liquidity:    liquidity,
+			}
+		} else {
+			// for unit test only
+			log.Warn("RonFi v3 updatePoolState, statedb is nil, use di instead (unit test only)")
+			var (
+				err          error
+				liquidity    *big.Int
+				sqrtPriceX96 *big.Int
+				tick         int
+			)
+			liquidity, err = p.di.GetV3Liquidity(p.Address)
+			if err != nil {
+				log.Warn("RonFi updatePoolState", "address", p.Address, "err", err)
+				return false
+			}
+
+			sqrtPriceX96, err = p.di.GetV3SqrtPriceX96(p.Address)
+			if err != nil {
+				log.Warn("RonFi updatePoolState", "address", p.Address, "err", err)
+				return false
+			}
+
+			tick, err = p.di.GetV3Tick(p.Address)
+			if err != nil {
+				log.Warn("RonFi updatePoolState", "address", p.Address, "err", err)
+				return false
+			}
+
+			p.State = &PoolState{
+				Tick:         tick,
+				SqrtPriceX96: sqrtPriceX96,
+				Liquidity:    liquidity,
+			}
+		}
 	}
+
+	return true
 }
 
-func (p *V3Pool) uniswapV3PoolSwap(
+func (p *Pool) uniswapV3PoolSwap(
 	zeroForOne bool,
 	amountSpecified *big.Int,
-	sqrtPriceLimitX96 *big.Int) *SwapState {
-	if amountSpecified.Cmp(ZERO) == 0 {
+	sqrtPriceLimitX96 *big.Int) (swapState *SwapState, amountSpecifiedRemaining *big.Int) {
+	if amountSpecified.BitLen() == 0 {
 		//log.Warn("RonFi uniswapV3PoolSwap", "err", "AS!")
-		return nil
+		return nil, nil
 	}
 
 	liquidity := new(big.Int).Set(p.State.Liquidity)
@@ -279,12 +307,12 @@ func (p *V3Pool) uniswapV3PoolSwap(
 	if zeroForOne {
 		if !(sqrtPriceLimitX96.Cmp(sqrtPriceX96) < 0 && sqrtPriceLimitX96.Cmp(MinSqrtRatio) > 0) {
 			log.Warn("RonFi uniswapV3PoolSwap", "err", "SPL")
-			return nil
+			return nil, nil
 		}
 	} else {
 		if !(sqrtPriceLimitX96.Cmp(sqrtPriceX96) > 0 && sqrtPriceLimitX96.Cmp(MaxSqrtRatio) < 0) {
 			log.Warn("RonFi uniswapV3PoolSwap", "err", "SPL")
-			return nil
+			return nil, nil
 		}
 	}
 
@@ -293,7 +321,7 @@ func (p *V3Pool) uniswapV3PoolSwap(
 		exactInput = true
 	}
 
-	swapState := &ComputeState{
+	computeState := &ComputeState{
 		amountSpecifiedRemaining: amountSpecified,
 		amountCalculated:         big.NewInt(0),
 		sqrtPriceX96:             sqrtPriceX96,
@@ -301,12 +329,15 @@ func (p *V3Pool) uniswapV3PoolSwap(
 		liquidity:                liquidity,
 	}
 
-	MaxCount := 20
-	MaxTickCount := 50
-	count := 0
+	startTime := mclock.Now()
+	MaxSteps := 500                    // If a Swap need 500 computeSwapStep(), i.e. exhaust 500 Ticks Liquidity, the amountIn must be a huge number!
+	MaxContinuousEmptyTickBitmap := 10 // At max, we allow 10 continuous empty TickBitmap words, that's 2560 ticks!
+	MaxTickCount := 10
+	steps := 0
 	tickCount := 0
-	for swapState.amountSpecifiedRemaining.Cmp(ZERO) != 0 && swapState.sqrtPriceX96.Cmp(sqrtPriceLimitX96) != 0 && count < MaxCount {
-		count++
+	continuousEmptyTickBitmap := 0
+	for computeState.amountSpecifiedRemaining.BitLen() > 0 && computeState.sqrtPriceX96.Cmp(sqrtPriceLimitX96) != 0 && steps < MaxSteps {
+		steps++
 		step := &StepState{
 			sqrtPriceStartX96: big.NewInt(0),
 			sqrtPriceNextX96:  big.NewInt(0),
@@ -316,32 +347,41 @@ func (p *V3Pool) uniswapV3PoolSwap(
 			amountOut:         big.NewInt(0),
 			feeAmount:         big.NewInt(0),
 		}
-		step.sqrtPriceStartX96 = swapState.sqrtPriceX96
+		step.sqrtPriceStartX96 = computeState.sqrtPriceX96
 
+		tickCount = 0
 		for tickCount < MaxTickCount {
 			tickCount++
-			wordPos, nextTick, initializedStatus, ok := nextInitializedTickWithinOneWord(p.tickBitMap, swapState.tick, p.PoolInfo.TickSpacing, zeroForOne)
+			// computeState.tick include TickSpacing
+			wordPos, nextTick, initializedStatus, ok := nextInitializedTickWithinOneWord(p.tickBitMap, computeState.tick, p.PoolInfo.TickSpacing, zeroForOne)
 			if ok {
-				step.tickNext = nextTick
+				step.tickNext = nextTick // nextTick also include TickSpacing
 				step.initialized = initializedStatus
-
-				tickNextWord, _ := position(step.tickNext)
-				if _, ok := p.tickBitMap[tickNextWord]; !ok {
-					p.updateTickDataAtWord(tickNextWord)
+				if initializedStatus {
+					continuousEmptyTickBitmap = 0
+				} else {
+					continuousEmptyTickBitmap++
+					//log.Info("uniswapV3PoolSwap", "steps", steps, "wordPos", wordPos, "continuousEmptyTickBitmap", continuousEmptyTickBitmap)
 				}
-
 				break
 			} else {
-				p.updateTickDataAtWord(wordPos)
+				p.updateTickBitmapAtWord(wordPos)
 			}
+		}
+		if tickCount >= MaxTickCount {
+			log.Warn("RonFi uniswapV3PoolSwap TickBitmap exception", "tx", p.tx.Hash().String(), "pool", p.Address, "elapsed", mclock.Since(startTime).String())
+			return nil, nil
 		}
 
 		if step.tickNext < MinTick {
+			//fmt.Println("RonFi uniswapV3PoolSwap, MinTick")
 			step.tickNext = MinTick
 		}
 		if step.tickNext > MaxTick {
+			//fmt.Println("RonFi uniswapV3PoolSwap, MaxTick")
 			step.tickNext = MaxTick
 		}
+		//log.Info("uniswapV3PoolSwap", "pool", p.Address.HexNoChecksum(), "tickNext", step.tickNext, "initialized", step.initialized, "steps", steps, "tickCount", tickCount, "elapsed", mclock.Since(startTime).String())
 
 		step.sqrtPriceNextX96 = getSqrtRatioAtTick(step.tickNext)
 		sqrtRatioTargetX96 := step.sqrtPriceNextX96
@@ -350,102 +390,172 @@ func (p *V3Pool) uniswapV3PoolSwap(
 			sqrtRatioTargetX96 = sqrtPriceLimitX96
 		}
 
-		if swapState.sqrtPriceX96 == nil ||
+		if computeState.sqrtPriceX96 == nil ||
 			sqrtRatioTargetX96 == nil ||
-			swapState.liquidity == nil ||
-			swapState.amountSpecifiedRemaining == nil {
+			computeState.liquidity == nil ||
+			computeState.amountSpecifiedRemaining == nil {
 			break
 		}
 
-		compRes := computeSwapStep(
-			swapState.sqrtPriceX96,
-			sqrtRatioTargetX96,
-			swapState.liquidity,
-			swapState.amountSpecifiedRemaining,
-			p.PoolInfo.Fee,
+		var (
+			compRes          *SwapStepState
+			maxSwapStepState *MaxSwapStepState
+			orgSqrtPriceX96  *big.Int
+			ok               bool
+			key              string
 		)
 
-		swapState.sqrtPriceX96 = compRes.sqrtRatioNextX96
+		if exactInput {
+			key = fmt.Sprintf("%d-%s-%s-%s", computeState.tick, computeState.sqrtPriceX96, sqrtRatioTargetX96, computeState.liquidity)
+			reused := false
+			if maxSwapStepState, ok = p.stepStateMap[key]; ok {
+				if maxSwapStepState.maxAmountIn.Cmp(computeState.amountSpecifiedRemaining) <= 0 {
+					reused = true
+					compRes = maxSwapStepState.stepStateMap
+				} else {
+					key = fmt.Sprintf("%d-%s-%s-%s-%s", computeState.tick, computeState.sqrtPriceX96, sqrtRatioTargetX96, computeState.liquidity, computeState.amountSpecifiedRemaining)
+					if maxSwapStepState, ok = p.stepStateMap[key]; ok {
+						reused = true
+						compRes = maxSwapStepState.stepStateMap
+					}
+				}
+			}
+
+			if !reused {
+				compRes = computeSwapStep(
+					computeState.sqrtPriceX96,
+					sqrtRatioTargetX96,
+					computeState.liquidity,
+					computeState.amountSpecifiedRemaining,
+					p.PoolInfo.Fee,
+				)
+			}
+		} else {
+			compRes = computeSwapStep(
+				computeState.sqrtPriceX96,
+				sqrtRatioTargetX96,
+				computeState.liquidity,
+				computeState.amountSpecifiedRemaining,
+				p.PoolInfo.Fee,
+			)
+		}
+
+		orgSqrtPriceX96 = new(big.Int).Set(computeState.sqrtPriceX96)
+		computeState.sqrtPriceX96 = compRes.sqrtRatioNextX96
 		step.amountIn = compRes.amountIn
 		step.amountOut = compRes.amountOut
 		step.feeAmount = compRes.feeAmount
+		//log.Info("computeSwapStep", "pool", p.Address.HexNoChecksum(), "steps", steps, "step.amountIn", step.amountIn, "step.amountOut", step.amountOut, "elapsed", mclock.Since(startTime).String())
 
 		//fmt.Printf("tick=%v -> tickNext= %v, sqrtPriceX96: %v -> sqrtPriceNextX96: %v, liquidity: %v, amountSpecifiedRemaining: %v, amountIn: %v, amountOut: %v, fee: %v\n",
-		//	swapState.tick, step.tickNext, swapState.sqrtPriceX96, step.sqrtPriceNextX96, swapState.liquidity, swapState.amountSpecifiedRemaining, step.amountIn, step.amountOut, p.PoolInfo.Fee)
+		//	computeState.tick, step.tickNext, computeState.sqrtPriceX96, step.sqrtPriceNextX96, computeState.liquidity, computeState.amountSpecifiedRemaining, step.amountIn, step.amountOut, p.PoolInfo.Fee)
 
 		if exactInput {
-			swapState.amountSpecifiedRemaining = new(big.Int).Sub(
-				swapState.amountSpecifiedRemaining,
+			computeState.amountSpecifiedRemaining = new(big.Int).Sub(
+				computeState.amountSpecifiedRemaining,
 				new(big.Int).Add(step.amountIn, step.feeAmount),
 			)
-			swapState.amountCalculated = new(big.Int).Sub(swapState.amountCalculated, step.amountOut)
+			computeState.amountCalculated = new(big.Int).Sub(computeState.amountCalculated, step.amountOut)
+
+			if computeState.amountSpecifiedRemaining.Cmp(ZERO) > 0 {
+				key = fmt.Sprintf("%d-%s-%s-%s", computeState.tick, orgSqrtPriceX96, sqrtRatioTargetX96, computeState.liquidity)
+				p.stepStateMap[key] = &MaxSwapStepState{
+					maxAmountIn:  new(big.Int).Add(step.amountIn, step.feeAmount),
+					stepStateMap: compRes,
+				}
+			} else {
+				key = fmt.Sprintf("%d-%s-%s-%s-%s", computeState.tick, orgSqrtPriceX96, sqrtRatioTargetX96, computeState.liquidity, computeState.amountSpecifiedRemaining)
+				p.stepStateMap[key] = &MaxSwapStepState{
+					maxAmountIn:  computeState.amountSpecifiedRemaining,
+					stepStateMap: compRes,
+				}
+			}
 		} else {
-			swapState.amountSpecifiedRemaining = new(big.Int).Add(swapState.amountSpecifiedRemaining, step.amountOut)
-			swapState.amountCalculated = new(big.Int).Add(
-				new(big.Int).Add(swapState.amountCalculated, step.amountIn),
+			computeState.amountSpecifiedRemaining = new(big.Int).Add(computeState.amountSpecifiedRemaining, step.amountOut)
+			computeState.amountCalculated = new(big.Int).Add(
+				new(big.Int).Add(computeState.amountCalculated, step.amountIn),
 				step.feeAmount,
 			)
 		}
 
-		if swapState.sqrtPriceX96.Cmp(step.sqrtPriceNextX96) == 0 {
+		if computeState.sqrtPriceX96.Cmp(step.sqrtPriceNextX96) == 0 {
 			if step.initialized {
 				liquidityNet := big.NewInt(0)
-				if data, ok := p.tickData[step.tickNext]; ok {
+				if data := p.getTickData(step.tickNext); data != nil {
 					liquidityNet = new(big.Int).Set(data.liquidityNet)
 				} else {
-					//log.Warn("RonFi uniswapV3PoolSwap", "err", "TBD")
-					return nil
+					log.Warn("RonFi uniswapV3PoolSwap getTickData fail", "pool", p.Address, "tick", step.tickNext)
+					return nil, nil
 				}
 				if zeroForOne {
 					liquidityNet = new(big.Int).Neg(liquidityNet)
 				}
 
-				swapState.liquidity = addDelta(swapState.liquidity, liquidityNet)
+				computeState.liquidity = addDelta(computeState.liquidity, liquidityNet)
 			}
 
 			if zeroForOne {
-				swapState.tick = step.tickNext - 1
+				computeState.tick = step.tickNext - 1
 			} else {
-				swapState.tick = step.tickNext
+				computeState.tick = step.tickNext
 			}
-		} else if swapState.sqrtPriceX96.Cmp(step.sqrtPriceStartX96) != 0 {
-			if tick, ok := getTickAtSqrtRatio(swapState.sqrtPriceX96); ok {
-				swapState.tick = tick
+		} else if computeState.sqrtPriceX96.Cmp(step.sqrtPriceStartX96) != 0 {
+			if tick, ok := getTickAtSqrtRatio(computeState.sqrtPriceX96); ok {
+				computeState.tick = tick
 			} else {
 				log.Warn("RonFi uniswapV3PoolSwap", "err", "GTS")
-				return nil
+				return nil, nil
 			}
+		}
+
+		if continuousEmptyTickBitmap >= MaxContinuousEmptyTickBitmap {
+			break
 		}
 	}
 
-	if count >= MaxCount || tickCount >= MaxTickCount {
-		//log.Warn("RonFi uniswapV3PoolSwap count overflow!", "tx", p.tx.Hash().String(), "pool", p.Address, "count", count, "tickCount", tickCount)
-		return nil
+	amountSpecifiedRemaining = new(big.Int).Set(computeState.amountSpecifiedRemaining)
+	amountIn := new(big.Int).Sub(amountSpecified, computeState.amountSpecifiedRemaining)
+	//log.Info("uniswapV3PoolSwap", "pool", p.Address.HexNoChecksum(), "amountSpecified", amountSpecified, "amountIn", amountIn, "amountOut", computeState.amountCalculated, "steps", steps, "elapsed", mclock.Since(startTime).String())
+	if steps >= MaxSteps {
+		log.Warn("RonFi uniswapV3PoolSwap max steps reached",
+			//"tx", p.tx.Hash().String(),
+			"pool", p.Address,
+			"steps", steps,
+			"amountSpecified", amountSpecified,
+			"amountIn", amountIn,
+			"amountOut", computeState.amountCalculated,
+			"elapsed", mclock.Since(startTime).String())
 	}
 
 	amount0 := big.NewInt(0)
 	amount1 := big.NewInt(0)
 	if zeroForOne == exactInput {
-		amount0 = new(big.Int).Sub(amountSpecified, swapState.amountSpecifiedRemaining)
-		amount1 = swapState.amountCalculated
+		amount0 = new(big.Int).Sub(amountSpecified, computeState.amountSpecifiedRemaining)
+		amount1 = computeState.amountCalculated
 	} else {
-		amount0 = swapState.amountCalculated
-		amount1 = new(big.Int).Sub(amountSpecified, swapState.amountSpecifiedRemaining)
+		amount0 = computeState.amountCalculated
+		amount1 = new(big.Int).Sub(amountSpecified, computeState.amountSpecifiedRemaining)
 	}
 
-	return &SwapState{
+	swapState = &SwapState{
 		amount0:      amount0,
 		amount1:      amount1,
-		sqrtPriceX96: swapState.sqrtPriceX96,
-		liquidity:    swapState.liquidity,
-		tick:         swapState.tick,
+		sqrtPriceX96: computeState.sqrtPriceX96,
+		liquidity:    computeState.liquidity,
+		tick:         computeState.tick,
 	}
+	return
 }
 
-func (p *V3Pool) CalculateTokensOutFromTokensIn(tokenIn common.Address, amountIn *big.Int) *big.Int {
+func (p *Pool) CalculateTokensOutFromTokensIn(tokenIn common.Address, amountIn *big.Int) (amountOut *big.Int, amountInRemaining *big.Int) {
 	if tokenIn != p.PoolInfo.Token0 && tokenIn != p.PoolInfo.Token1 {
-		log.Warn("RonFi calculateTokensOutFromTokensIn", "tokenIn", tokenIn)
-		return nil
+		log.Warn("RonFi CalculateTokensOutFromTokensIn", "pool", p.Address, "tokenIn", tokenIn)
+		return
+	}
+
+	if amountIn == nil || amountIn.Cmp(ZERO) <= 0 {
+		log.Warn("RonFi CalculateTokensOutFromTokensIn", "pool", p.Address, "tokenIn", tokenIn)
+		return
 	}
 
 	zeroForOne := false
@@ -460,13 +570,77 @@ func (p *V3Pool) CalculateTokensOutFromTokensIn(tokenIn common.Address, amountIn
 		sqrtPriceLimitX96 = big.NewInt(0).Sub(MaxSqrtRatio, big.NewInt(1))
 	}
 
-	res := p.uniswapV3PoolSwap(zeroForOne, amountIn, sqrtPriceLimitX96)
+	res, remaining := p.uniswapV3PoolSwap(zeroForOne, amountIn, sqrtPriceLimitX96)
 	if res == nil {
-		return new(big.Int).SetUint64(0)
+		return big.NewInt(0), big.NewInt(0)
 	}
 	if zeroForOne {
-		return new(big.Int).Neg(res.amount1)
+		amountOut = new(big.Int).Neg(res.amount1)
 	} else {
-		return new(big.Int).Neg(res.amount0)
+		amountOut = new(big.Int).Neg(res.amount0)
 	}
+	amountInRemaining = remaining
+	return
+}
+
+func (p *Pool) CalculateTokensInFromTokensOut(tokenOut common.Address, amountOut *big.Int) (amountIn *big.Int, amountOutRemaining *big.Int) {
+	if tokenOut != p.PoolInfo.Token0 && tokenOut != p.PoolInfo.Token1 {
+		log.Warn("RonFi CalculateTokensInFromTokensOut", "tokenOut", tokenOut)
+		return
+	}
+
+	if amountOut == nil || amountOut.Cmp(ZERO) <= 0 {
+		log.Warn("RonFi CalculateTokensInFromTokensOut", "pool", p.Address, "tokenOut", tokenOut)
+		return
+	}
+
+	zeroForOne := false
+	if tokenOut == p.PoolInfo.Token1 {
+		zeroForOne = true
+	}
+
+	var sqrtPriceLimitX96 *big.Int
+	if zeroForOne {
+		sqrtPriceLimitX96 = big.NewInt(0).Add(MinSqrtRatio, big.NewInt(1))
+	} else {
+		sqrtPriceLimitX96 = big.NewInt(0).Sub(MaxSqrtRatio, big.NewInt(1))
+	}
+	swapState, remaining := p.uniswapV3PoolSwap(zeroForOne, new(big.Int).Neg(amountOut), sqrtPriceLimitX96)
+
+	if zeroForOne {
+		amountIn = swapState.amount0
+	} else {
+		amountIn = swapState.amount1
+	}
+	amountOutRemaining = remaining
+
+	return
+}
+
+func (p *Pool) MaxTokensInFromTokensOut(tokenOut common.Address) (amountIn *big.Int) {
+	if tokenOut != p.PoolInfo.Token0 && tokenOut != p.PoolInfo.Token1 {
+		log.Warn("RonFi CalculateTokensInFromTokensOut", "tokenOut", tokenOut)
+		return
+	}
+
+	zeroForOne := false
+	if tokenOut == p.PoolInfo.Token1 {
+		zeroForOne = true
+	}
+
+	var sqrtPriceLimitX96 *big.Int
+	if zeroForOne {
+		sqrtPriceLimitX96 = big.NewInt(0).Add(MinSqrtRatio, big.NewInt(1))
+	} else {
+		sqrtPriceLimitX96 = big.NewInt(0).Sub(MaxSqrtRatio, big.NewInt(1))
+	}
+	swapState, _ := p.uniswapV3PoolSwap(zeroForOne, new(big.Int).Neg(MaxUint256), sqrtPriceLimitX96)
+
+	if zeroForOne {
+		amountIn = swapState.amount0
+	} else {
+		amountIn = swapState.amount1
+	}
+
+	return
 }

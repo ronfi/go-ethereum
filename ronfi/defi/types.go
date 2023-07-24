@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type RonBalance struct {
+type RonFiBalance struct {
 	Eth float64
 
 	Total         float64
@@ -21,8 +21,8 @@ type RonBalance struct {
 }
 
 // Copy execute a deep copy
-func (b *RonBalance) Copy() RonBalance {
-	return RonBalance{
+func (b *RonFiBalance) Copy() RonFiBalance {
+	return RonFiBalance{
 		Eth:           b.Eth,
 		Total:         b.Total,
 		ContractTotal: b.ContractTotal,

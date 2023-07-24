@@ -1,7 +1,6 @@
 package defi
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,11 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
-	"github.com/ethereum/go-ethereum/ronfi/contracts/contract_basev1"
-	deMax "github.com/ethereum/go-ethereum/ronfi/contracts/contract_demax"
-	dodoPool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_dodo"
 	erc20token "github.com/ethereum/go-ethereum/ronfi/contracts/contract_erc20"
-	pancakePair "github.com/ethereum/go-ethereum/ronfi/contracts/contract_pancakepair"
+	v2pair "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v2pair"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
 	v3TickLens "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3ticklens"
 	"github.com/ethereum/go-ethereum/ronfi/db"
@@ -25,17 +21,11 @@ import (
 type Protocol int
 
 const (
-	PanCake Protocol = iota
-	DodoSwap
-	BaseV1
-	DeMax
+	UniSwap Protocol = iota
 )
 
 var (
-	DoDoSwapId = crypto.Keccak256([]byte("_BASE_TOKEN_()"))[:4]
-	DeMaxId    = crypto.Keccak256([]byte("FACTORY()"))[:4]
-	BaseV1Id   = crypto.Keccak256([]byte("metadata()"))[:4]
-	Token0Id   = crypto.Keccak256([]byte("token0()"))[:4]
+	Token0Id = crypto.Keccak256([]byte("token0()"))[:4]
 )
 
 func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
@@ -200,7 +190,7 @@ func (di *Info) GetV3SqrtPriceX96(address common.Address) (*big.Int, error) {
 	return nil, errors.New("get v3 sqrt price failed")
 }
 
-func (di *Info) GetV3CurrentTick(address common.Address) (int, error) {
+func (di *Info) GetV3Tick(address common.Address) (int, error) {
 	if inst, err := v3pool.NewV3pool(address, di.client); err == nil {
 		if slot0, err := inst.Slot0(nil); err == nil {
 			return int(slot0.Tick.Int64()), nil
@@ -210,17 +200,7 @@ func (di *Info) GetV3CurrentTick(address common.Address) (int, error) {
 	return 0, errors.New("get v3 current tick failed")
 }
 
-func (di *Info) GetV3CurrentSqrtPriceX96(address common.Address) (*big.Int, error) {
-	if inst, err := v3pool.NewV3pool(address, di.client); err == nil {
-		if liquidity, err := inst.Liquidity(nil); err == nil {
-			return liquidity, nil
-		}
-	}
-
-	return nil, errors.New("get pool liquidity failed")
-}
-
-func (di *Info) GetV3CurrentLiquidity(address common.Address) (*big.Int, error) {
+func (di *Info) GetV3Liquidity(address common.Address) (*big.Int, error) {
 	if inst, err := v3pool.NewV3pool(address, di.client); err == nil {
 		if liquidity, err := inst.Liquidity(nil); err == nil {
 			return liquidity, nil
@@ -262,37 +242,36 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 		return
 	}
 
-	codeAddr := pair
-	if target, ok := di.proxy.detectProxyTarget(pair); ok {
-		codeAddr = target
-	}
+	//codeAddr := pair
+	//if target, ok := di.proxy.detectProxyTarget(pair); ok {
+	//	codeAddr = target
+	//}
+	//
+	//bytecode, err := di.client.CodeAt(context.Background(), codeAddr, nil)
+	//if err != nil || len(bytecode) <= 1 {
+	//	return
+	//}
 
-	bytecode, err := di.client.CodeAt(context.Background(), codeAddr, nil)
-	if err != nil || len(bytecode) <= 1 {
-		return
-	}
+	//defiProtocol := UniSwap
+	//if bytes.Contains(bytecode, DoDoSwapId) {
+	//	defiProtocol = DodoSwap
+	//} else if bytes.Contains(bytecode, BaseV1Id) {
+	//	defiProtocol = BaseV1
+	//} else if bytes.Contains(bytecode, DeMaxId) {
+	//	defiProtocol = DeMax
+	//} else {
+	//	if !bytes.Contains(bytecode, Token0Id) {
+	//		return
+	//	}
+	//}
 
-	defiProtocol := PanCake
-	if bytes.Contains(bytecode, DoDoSwapId) {
-		defiProtocol = DodoSwap
-	} else if bytes.Contains(bytecode, BaseV1Id) {
-		defiProtocol = BaseV1
-	} else if bytes.Contains(bytecode, DeMaxId) {
-		defiProtocol = DeMax
-	} else {
-		if !bytes.Contains(bytecode, Token0Id) {
-			return
-		}
+	//switch defiProtocol {
+	//default:
+	pairInfo = di.getUniSwapPairInfo(pair)
+	if pairInfo == nil {
+		log.Warn("RonFi Defi get pair info failed", "pair", pair.Hex())
 	}
-
-	switch defiProtocol {
-	case DodoSwap:
-		pairInfo = di.getDodoPairInfo(pair)
-	case BaseV1:
-		pairInfo = di.getBaseV1PairInfo(pair)
-	default:
-		pairInfo = di.getPancakePairInfo(defiProtocol, pair)
-	}
+	//}
 
 	di.lock.Lock()
 	if pairInfo != nil {
@@ -304,72 +283,9 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 	return
 }
 
-func (di *Info) getDodoPairInfo(pair common.Address) *PairInfo {
-	if inst, err := dodoPool.NewDppAdvanced(pair, di.client); err == nil {
-		if baseToken, err := inst.BASETOKEN(nil); err == nil {
-			if quoteToken, err := inst.QUOTETOKEN(nil); err == nil {
-				token0, token1, dir := rcommon.SortTokens(baseToken, quoteToken)
-				reserve0, _ := inst.BASERESERVE(nil)
-				reserve1, _ := inst.QUOTERESERVE(nil)
-				if reserve0 == nil || reserve1 == nil {
-					return nil
-				}
-				if dir == 1 {
-					tmp := reserve0
-					reserve0 = reserve1
-					reserve1 = tmp
-				}
-
-				return di.buildPairInfo(pair, rcommon.ZeroAddress, token0, token1, "dodo", reserve0, reserve1)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (di *Info) getBaseV1PairInfo(pair common.Address) *PairInfo {
-	if inst, err := basev1.NewBasev1(pair, di.client); err == nil {
-		if meta, err := inst.Metadata(nil); err == nil {
-			factory, err := inst.Factory(nil)
-			if err != nil {
-				factory = rcommon.ZeroAddress
-			}
-
-			name, err := inst.Name(nil)
-			if err != nil {
-				name = "basev1"
-			}
-
-			return di.buildPairInfo(pair, factory, meta.T0, meta.T1, name, meta.R0, meta.R1)
-		}
-	}
-
-	return nil
-}
-
-func (di *Info) getPancakePairInfo(defiProtocol Protocol, pair common.Address) *PairInfo {
-	if defiProtocol == DeMax {
-		if inst, err := deMax.NewDemax(pair, di.client); err == nil {
-			if token0, err := inst.Token0(nil); err == nil {
-				if token1, err := inst.Token1(nil); err == nil {
-					if reserves, err := inst.GetReserves(nil); err == nil {
-						factory, err := inst.FACTORY(nil)
-						if err != nil {
-							factory = rcommon.ZeroAddress
-						}
-
-						name, err := inst.Name(nil)
-						if err != nil {
-							name = "demax"
-						}
-						return di.buildPairInfo(pair, factory, token0, token1, name, reserves.Reserve0, reserves.Reserve1)
-					}
-				}
-			}
-		}
-	} else {
-		if inst, err := pancakePair.NewPancakepair(pair, di.client); err == nil {
+func (di *Info) getUniSwapPairInfo(pair common.Address) *PairInfo {
+	{
+		if inst, err := v2pair.NewV2pair(pair, di.client); err == nil {
 			if token0, err := inst.Token0(nil); err == nil {
 				if token1, err := inst.Token1(nil); err == nil {
 					if reserves, err := inst.GetReserves(nil); err == nil {
@@ -442,79 +358,17 @@ func (di *Info) findPairResvIndex(pair common.Address, reserve0, reserve1 *big.I
 }
 
 func (di *Info) GetPairReserves(pair common.Address) *Reserve {
-	codeAddr := pair
-	if target, ok := di.proxy.detectProxyTarget(pair); ok {
-		codeAddr = target
+	var resv *Reserve
+	resv = di.getPancakePairReserves(pair)
+	if resv == nil {
+		log.Warn("RonFi Defi get pancake pair reserves failed", "pair", pair.Hex())
 	}
 
-	bytecode, err := di.client.CodeAt(context.Background(), codeAddr, nil)
-	if err != nil || len(bytecode) <= 1 {
-		return nil
-	}
-
-	defiProtocol := PanCake
-	if bytes.Contains(bytecode, DoDoSwapId) {
-		defiProtocol = DodoSwap
-	} else if bytes.Contains(bytecode, BaseV1Id) {
-		defiProtocol = BaseV1
-	} else if bytes.Contains(bytecode, DeMaxId) {
-		defiProtocol = DeMax
-	} else {
-		if !bytes.Contains(bytecode, Token0Id) {
-			return nil
-		}
-	}
-
-	switch defiProtocol {
-	case DodoSwap:
-		return di.getDoDoPairReserves(pair)
-	case BaseV1:
-		return di.getBaseV1PairReserves(pair)
-	default:
-		return di.getPancakePairReserves(pair)
-	}
-}
-
-func (di *Info) getDoDoPairReserves(pair common.Address) *Reserve {
-	if inst, err := dodoPool.NewDppAdvanced(pair, di.client); err == nil {
-		if baseToken, err := inst.BASETOKEN(nil); err == nil {
-			if quoteToken, err := inst.QUOTETOKEN(nil); err == nil {
-				_, _, dir := rcommon.SortTokens(baseToken, quoteToken)
-				reserve0, _ := inst.BASERESERVE(nil)
-				reserve1, _ := inst.QUOTERESERVE(nil)
-				if dir == 1 {
-					tmp := reserve0
-					reserve0 = reserve1
-					reserve1 = tmp
-				}
-				return &Reserve{
-					reserve0,
-					reserve1,
-					uint32(0),
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (di *Info) getBaseV1PairReserves(pair common.Address) *Reserve {
-	if inst, err := basev1.NewBasev1(pair, di.client); err == nil {
-		if meta, err := inst.Metadata(nil); err == nil {
-			return &Reserve{
-				meta.R0,
-				meta.R1,
-				uint32(0),
-			}
-		}
-	}
-
-	return nil
+	return resv
 }
 
 func (di *Info) getPancakePairReserves(pair common.Address) *Reserve {
-	if inst, err := pancakePair.NewPancakepair(pair, di.client); err == nil {
+	if inst, err := v2pair.NewV2pairCaller(pair, di.client); err == nil {
 		if reserves, err := inst.GetReserves(nil); err == nil {
 			return &Reserve{
 				reserves.Reserve0,

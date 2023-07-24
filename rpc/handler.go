@@ -19,6 +19,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/cmap"
 	"reflect"
 	"strconv"
 	"strings"
@@ -28,8 +29,19 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const (
+	// MaxAllIngressKnownTxs the maximum transactions hashes to keep in the known list
+	// before starting to randomly evict them.
+	MaxAllIngressKnownTxs = 8 * 8192 // for each shard, the total is this multiply 256 (MapsetShardCount), i.e. 16M items.
+)
+
 var (
 	StartTrading = false
+	LogPairGas   = false
+	LogPairUse   = false
+
+	// AllIngressTxs Set of transaction received from all peers
+	AllIngressTxs = cmap.NewMapsetMini(256, MaxAllIngressKnownTxs)
 )
 
 // handler handles JSON-RPC messages. There is one handler per connection. Note that

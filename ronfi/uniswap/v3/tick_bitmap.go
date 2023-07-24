@@ -56,7 +56,7 @@ func nextInitializedTickWithinOneWord(tickBitMap TickBitMap, tick, tickSpacing i
 
 	compressed := tick / tickSpacing
 	if tick < 0 && tick%tickSpacing != 0 {
-		compressed -= 1
+		compressed--
 	}
 
 	if lte {
@@ -70,13 +70,13 @@ func nextInitializedTickWithinOneWord(tickBitMap TickBitMap, tick, tickSpacing i
 
 		bitmapWord, exist := tickBitMap[wordPos]
 		if !exist {
-			//log.Warn("RonFi nextInitializedTickWithinOneWord Called nextInitializedTickWithinOneWord on missing word",
+			//log.Warn("nextInitializedTickWithinOneWord Called on missing word",
 			//	"wordPos", wordPos, "bitPos", bitPos, "compressed", compressed, "tick", tick, "tickSpacing", tickSpacing, "lte", lte)
 			return wordPos, nextTick, initializedStatus, false
 		}
 
 		masked = new(big.Int).And(bitmapWord, mask)
-		if masked.Cmp(ZERO) != 0 {
+		if masked.BitLen() > 0 {
 			initializedStatus = true
 		}
 
@@ -85,6 +85,7 @@ func nextInitializedTickWithinOneWord(tickBitMap TickBitMap, tick, tickSpacing i
 		} else {
 			nextTick = (compressed - int(bitPos)) * tickSpacing
 		}
+		//log.Info("nextInitializedTickWithinOneWord", "tick", tick, "nextTick", nextTick, "compressed", compressed, "bitmap", fmt.Sprintf("%x", bitmapWord))
 	} else {
 		wordPos, bitPos := position(compressed + 1)
 		mask := new(big.Int).Not(new(big.Int).Sub(
@@ -94,13 +95,13 @@ func nextInitializedTickWithinOneWord(tickBitMap TickBitMap, tick, tickSpacing i
 
 		bitmapWord, exist := tickBitMap[wordPos]
 		if !exist {
-			//log.Warn("RonFi nextInitializedTickWithinOneWord Called nextInitializedTickWithinOneWord on missing word",
+			//log.Warn("nextInitializedTickWithinOneWord Called on missing word",
 			//	"wordPos", wordPos, "bitPos", bitPos, "compressed", compressed, "tick", tick, "tickSpacing", tickSpacing, "lte", lte)
 			return wordPos, nextTick, initializedStatus, false
 		}
 
 		masked = new(big.Int).And(bitmapWord, mask)
-		if masked.Cmp(ZERO) != 0 {
+		if masked.BitLen() > 0 {
 			initializedStatus = true
 		}
 
@@ -109,6 +110,7 @@ func nextInitializedTickWithinOneWord(tickBitMap TickBitMap, tick, tickSpacing i
 		} else {
 			nextTick = (compressed + 1 + int(0xFF-bitPos)) * tickSpacing
 		}
+		//log.Info("nextInitializedTickWithinOneWord", "tick", tick, "nextTick", nextTick, "compressed", compressed, "bitmap", fmt.Sprintf("%x", bitmapWord))
 	}
 
 	return 0, nextTick, initializedStatus, true

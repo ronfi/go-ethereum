@@ -84,16 +84,16 @@ func (p *SwapLoop) Copy() *SwapLoop {
 }
 
 func (p *SwapLoop) ToV3ArbPath(pairGasMap map[string]uint64) uniswap.V3ArbPath {
-	v3ArbPath := make([]*uniswap.UniswapPool, 0, len(p.Path))
+	v3ArbPath := make([]*uniswap.Pool, 0, len(p.Path))
 	for i := 0; i < len(p.Path); i++ {
 		addr := p.Path[i]
 		if i%2 != 0 {
 			pf := p.PoolFee[i/2]
 			tf := p.TokenFee[i/2]
 			dir := p.Dirs[i/2]
-			pt := uniswap.UniswapV2
+			pt := uniswap.V2
 			if dir>>0x2 == 1 {
-				pt = uniswap.UniswapV3
+				pt = uniswap.V3
 				pf = 0
 			}
 			dir = dir & 0x1
@@ -102,7 +102,7 @@ func (p *SwapLoop) ToV3ArbPath(pairGasMap map[string]uint64) uniswap.V3ArbPath {
 			if !ok {
 				gasNeeded = 150000
 			}
-			pool := uniswap.UniswapPool{
+			pool := uniswap.Pool{
 				PoolAddr: addr,
 				PoolType: pt,
 				PoolFee:  int(pf),

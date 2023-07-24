@@ -182,3 +182,14 @@ func ToKey(path []common.Address) string {
 
 	return result
 }
+
+func IsValidFactory(factory common.Address) bool {
+	ok := false
+
+	_, ok = ValidV2FactsMap[factory]
+	if !ok {
+		_, ok = ValidV3FactsMap[factory]
+	}
+
+	return ok
+}

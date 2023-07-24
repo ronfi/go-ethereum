@@ -48,10 +48,28 @@ const (
 	BlobTxType       = 0x03
 )
 
+type RonFiTxType int
+
+// RonFi Transaction types.
+const (
+	RonTxIsUnknown RonFiTxType = iota
+	RonTxIsDexTx               // a dex transaction. i.e. 'core.CheckIfDexTx(tx)' is true.
+	RonTxIsObsTx               // an obs transaction, we could ignore it when received from peers, for performance reason.
+	RonTxIsArbTx               // an arbitrage transaction from RonFi trading node/s.
+)
+
 // Transaction is an Ethereum transaction.
 type Transaction struct {
 	inner TxData    // Consensus contents of a transaction
 	time  time.Time // Time first seen locally (spam avoidance)
+
+	PeerRTTime  int64  // RonFi: Round trip time from the peer where this tx comes from
+	PeerId      uint64 // RonFi: For statistics. It's the first 8-bytes of the real peer ID which is 32 bytes.
+	PeerRank    int    // RonFi: For arbitrate transaction strategy
+	Duplicate   bool   // RonFi: Whether this is a duplicated transaction which has been received before
+	RonTxType   RonFiTxType
+	RonPeerName string
+	EarlySent   bool // RonFi: If this target transaction has been early sent before.
 
 	// caches
 	hash atomic.Value

@@ -2,6 +2,9 @@ package stats
 
 import (
 	"context"
+	"encoding/binary"
+	"fmt"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/loops"
@@ -26,6 +29,8 @@ type Stats struct {
 	chain         *core.BlockChain
 	client        *ethclient.Client
 	di            *defi.Info
+	rdb           *redis.Client
+	mysql         *db.Mysql
 	currentHeader *types.Header
 
 	stopCh chan struct{}
@@ -111,10 +116,10 @@ func NewStats(
 		client: nil,
 		stopCh: make(chan struct{}),
 	}
-	s.initialBalance.Store(defi.RonBalance{})
-	s.prevBalance.Store(defi.RonBalance{})
-	s.v3InitialBalance.Store(defi.RonBalance{})
-	s.v3PrevBalance.Store(defi.RonBalance{})
+	s.initialBalance.Store(defi.RonFiBalance{})
+	s.prevBalance.Store(defi.RonFiBalance{})
+	s.v3InitialBalance.Store(defi.RonFiBalance{})
+	s.v3PrevBalance.Store(defi.RonFiBalance{})
 
 	s.startTime = mclock.Now()
 	s.prevResetTime = time.Now()
@@ -143,6 +148,8 @@ func NewStats(
 
 	s.client = client
 	s.di = di
+	s.rdb = redis
+	s.mysql = mysql
 
 	balance := s.di.GetAllBalance(rcommon.AllTradingExecutors, false)
 	balanceV3 := s.di.GetAllBalance(rcommon.AllV3TradingExecutors, true)
@@ -163,7 +170,6 @@ func NewStats(
 	s.loopsMap = loopsMap
 	s.loopsIdMap = loopsIdMap
 
-	PrevBlockTargetDexTxs = make(map[uint64]TargetDexInfo)
 	PrevBlockTxs = 0
 
 	s.obsPairStats = make(ObsAllPairStatsMap)
@@ -281,6 +287,86 @@ func (s *Stats) Run() {
 		case <-s.stopCh:
 			log.Info("RonFi stats exit")
 			return
+		}
+	}
+}
+
+// collect the GasUsed of all the dex pairs
+func (s *Stats) dexPairGasUsed(txs types.Transactions, receipts types.Receipts, bh common.Hash) {
+	for _, tx := range txs {
+		to := tx.To()
+		if to == nil {
+			continue
+		}
+		txLookup := s.chain.GetTransactionLookup(tx.Hash())
+		if txLookup == nil || txLookup.BlockHash != bh {
+			// maybe chain reorg
+			return
+		}
+		if txLookup.Index >= uint64(len(receipts)) {
+			log.Error("RonFi report", "dexTx", tx.Hash().String(), "BlockIndex", txLookup.BlockIndex, "Index", txLookup.Index, "receipts", len(receipts))
+			return
+		}
+
+		receipt := receipts[txLookup.Index]
+		if receipt.Status != 1 {
+			// only collect the success dex tx gasUsed
+			continue
+		}
+
+		data := tx.Data()
+		if len(data) < 4 {
+			continue
+		}
+
+		// collect dex pairs
+		methodID := uint64(binary.BigEndian.Uint32(data[:4]))
+		swapPairsInfo := s.di.ExtractSwapPairInfo(s.loopsMap.AllPairsMap, nil, tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypePairs)
+		for _, swapPairInfo := range swapPairsInfo {
+			// collect all dex pairs
+			if frequency, exist := s.dexPairs[swapPairInfo.Address]; !exist {
+				s.dexPairs[swapPairInfo.Address] = 1
+			} else {
+				s.dexPairs[swapPairInfo.Address] = frequency + 1
+			}
+		}
+
+		// collect pair gas info
+		if len(swapPairsInfo) == 1 {
+			// calculate pair gas for one-hop swaps
+			key := swapPairsInfo[0].Key
+			if averageGasUsed, ok := s.pairMaxGasUsed[key]; ok {
+				if receipt.GasUsed > averageGasUsed*2 { // Gas >200% suddenly
+					log.Warn("RonFi pair gas collector, gas rise", "dexTx", tx.Hash().String(), "oldGas", averageGasUsed, "newGas", receipt.GasUsed)
+				} else if receipt.GasUsed*2 < averageGasUsed { // Gas < 50% suddenly
+					log.Warn("RonFi pair gas collector, gas drop", "dexTx", tx.Hash().String(), "oldGas", averageGasUsed, "newGas", receipt.GasUsed)
+				}
+				s.pairMaxGasUsed[key] = averageGasUsed - averageGasUsed/32 + receipt.GasUsed/32 // 31/32 * old + 1/32 * new, to filter any exceptional sharp peak
+			} else {
+				s.pairMaxGasUsed[key] = receipt.GasUsed
+			}
+		}
+
+		// collect obs routers info
+		// note: these collected obs method MUST NOT be used directly! which is highly possible to be reused by some other contracts but not obs!
+		//		 best practice is to manually check these obs methods and commit into github one by one! carefully!
+		_, IsObsTx := s.di.CheckIfObsTx(s.loopsMap.AllPairsMap, tx, receipt.Logs, *to)
+		if IsObsTx {
+			if txpool.ObsMethods != nil {
+				if _, exist := txpool.ObsMethods[methodID]; !exist {
+					// only if the methodId is not in the core.ObsMethods list, collect the obs routers info
+					if s.obsRouters != nil && to != nil {
+						if _, exist := s.obsRouters[*to]; !exist {
+							s.obsRouters[*to] = methodID
+							s.obsCol.notifyObs(&rcommon.NewObs{
+								Router:   *to,
+								MethodID: uint32(methodID),
+							})
+							log.Info("RonFi new obs found", "tx", tx.Hash().String(), "obs", tx.To(), "methodId", fmt.Sprintf("0x%08x", methodID))
+						}
+					}
+				}
+			}
 		}
 	}
 }

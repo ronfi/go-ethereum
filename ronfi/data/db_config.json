@@ -4,10 +4,10 @@
     "port": "3306",
     "user": "root",
     "pass": "rkdb",
-    "data": "rkdb"
+    "data": "rkdb_eth"
   },
   "redis": {
-    "host": "176.9.120.196",
+    "host": "3.83.22.96",
     "port": "6379"
   }
 }

@@ -354,3 +354,23 @@ func (newObs *NewObs) ToJsonNewObs() *JsonNewObs {
 		MethodID: newObs.MethodID,
 	}
 }
+
+type JsonNewDex struct {
+	Router string `json:"router"`
+}
+
+func (record *JsonNewDex) ToNewDex() *NewObs {
+	return &NewObs{
+		Router: common.HexToAddress(record.Router),
+	}
+}
+
+type NewDex struct {
+	Router common.Address
+}
+
+func (newDex *NewDex) ToJsonNewDex() *JsonNewDex {
+	return &JsonNewDex{
+		Router: newDex.Router.String(),
+	}
+}

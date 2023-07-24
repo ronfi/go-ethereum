@@ -69,19 +69,19 @@ func computeSwapStep(
 	}
 
 	if zeroForOne {
-		if max && exactIn {
+		if !max || !exactIn {
 			amountIn = getAmount0Delta(sqrtRatioNextX96, sqrtRatioCurrentX96, liquidity, true)
 		}
 
-		if !(max && !exactIn) {
+		if !max || exactIn {
 			amountOut = getAmount1Delta(sqrtRatioNextX96, sqrtRatioCurrentX96, liquidity, false)
 		}
 	} else {
-		if !(max && exactIn) {
+		if !max || !exactIn {
 			amountIn = getAmount1Delta(sqrtRatioCurrentX96, sqrtRatioNextX96, liquidity, true)
 		}
 
-		if !(max && !exactIn) {
+		if !max || exactIn {
 			amountOut = getAmount0Delta(sqrtRatioCurrentX96, sqrtRatioNextX96, liquidity, false)
 		}
 	}
