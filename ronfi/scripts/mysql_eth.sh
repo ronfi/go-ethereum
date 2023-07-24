@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOST="54.173.196.228"
+HOST="172.31.85.248"
 PORT="3306"
 USER="bsc"
 PASS="ronfi"
