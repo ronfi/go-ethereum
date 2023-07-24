@@ -126,6 +126,11 @@ func (di *Info) GetPoolInfo(address common.Address) (info *PoolInfo) {
 	}
 
 	if inst, err := v3pool.NewV3pool(address, di.client); err == nil {
+		factory, err := inst.Factory(nil)
+		if err != nil {
+			return
+		}
+
 		if token0, err := inst.Token0(nil); err == nil {
 			if token1, err := inst.Token1(nil); err == nil {
 				if tickSpacing, err := inst.TickSpacing(nil); err == nil {
@@ -151,6 +156,7 @@ func (di *Info) GetPoolInfo(address common.Address) (info *PoolInfo) {
 							Token1:      token1,
 							Fee:         fee,
 							TickSpacing: int(tickSpacing.Int64()),
+							Factory:     factory,
 						}
 
 						di.lock.Lock()
