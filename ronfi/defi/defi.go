@@ -451,3 +451,22 @@ func (di *Info) GetTokenBalance(account common.Address, token common.Address) *b
 
 	return nil
 }
+
+func (di *Info) MergePairTokensInfo() {
+	di.lock.Lock()
+	for k, v := range di.newPairsInfo {
+		di.pairsInfo[k] = v
+	}
+	di.newPairsInfo = make(map[common.Address]*PairInfo)
+
+	for k, v := range di.newTokensInfo {
+		di.tokensInfo[k] = v
+	}
+	di.newTokensInfo = make(map[common.Address]*TokenInfo)
+
+	for k, v := range di.newPoolsInfo {
+		di.poolsInfo[k] = v
+	}
+	di.newPoolsInfo = make(map[common.Address]*PoolInfo)
+	di.lock.Unlock()
+}

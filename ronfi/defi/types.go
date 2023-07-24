@@ -40,6 +40,7 @@ type PoolInfo struct {
 	Token1      common.Address
 	Fee         *big.Int
 	TickSpacing int
+	Factory     common.Address
 }
 
 type PairInfo struct {

@@ -246,6 +246,8 @@ func (s *Stats) Run() {
 						s.obsProfitReport(id)
 					}
 
+					s.UpdatePairTokensInfo()
+
 					// report obs arbitrage contract/method statistics
 					s.obsContractReport()
 
@@ -398,4 +400,69 @@ func (s *Stats) ResetStats() {
 
 	s.obsStats = make(ObsAllStatsMap)
 	s.obsStats.init()
+}
+
+func (s *Stats) UpdatePairTokensInfo() {
+	// update pairs/tokens into mysql
+	newPairsInfo := s.di.GetNewPairsInfo()
+	newPoolsInfo := s.di.GetNewPoolsInfo()
+	newTokensInfo := s.di.GetNewTokensInfo()
+	if newPairsInfo != nil && len(newPairsInfo) > 0 {
+		pRecords := make([]*db.PairInfoRecord, 0, len(newPairsInfo))
+		for pair, info := range newPairsInfo {
+			pRecord := &db.PairInfoRecord{
+				Pair:         pair.String(),
+				Name:         info.Name,
+				Index:        info.Index,
+				BothBriToken: info.BothBriToken,
+				KeyToken:     info.KeyToken.String(),
+				Token0:       info.Token0.String(),
+				Token1:       info.Token1.String(),
+				Factory:      info.Factory.String(),
+			}
+			pRecords = append(pRecords, pRecord)
+		}
+		s.mysql.InsertPairsInfo(pRecords)
+		log.Info("RonFi Stats new pairs", "count", len(pRecords))
+	} else {
+		log.Info("RonFi Stats No new pairs found!")
+	}
+
+	if newPoolsInfo != nil && len(newPoolsInfo) > 0 {
+		pRecords := make([]*db.PoolInfoRecord, 0, len(newPoolsInfo))
+		for pool, info := range newPoolsInfo {
+			pRecord := &db.PoolInfoRecord{
+				Pool:        pool.String(),
+				Name:        info.Name,
+				Token0:      info.Token0.String(),
+				Token1:      info.Token1.String(),
+				Fee:         int(info.Fee.Int64()),
+				TickSpacing: info.TickSpacing,
+				Factory:     info.Factory.String(),
+			}
+			pRecords = append(pRecords, pRecord)
+		}
+		s.mysql.InsertPoolsInfo(pRecords)
+		log.Info("RonFi Stats new pools", "count", len(newPoolsInfo))
+	} else {
+		log.Info("RonFi Stats No new pools found!")
+	}
+
+	if newTokensInfo != nil && len(newTokensInfo) > 0 {
+		tRecords := make([]*db.TokenInfoRecord, 0, len(newTokensInfo))
+		for token, info := range newTokensInfo {
+			tRecord := &db.TokenInfoRecord{
+				Token:    token.String(),
+				Symbol:   info.Symbol,
+				Decimals: info.Decimals,
+			}
+			tRecords = append(tRecords, tRecord)
+			s.mysql.InsertTokensInfo(tRecords)
+		}
+	} else {
+		log.Info("RonFi Stats No new tokens found!")
+	}
+
+	// Merge new pairs into all pairs map
+	s.di.MergePairTokensInfo()
 }

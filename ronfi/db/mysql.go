@@ -899,6 +899,7 @@ type PoolInfoRecord struct {
 	Token1      string
 	Fee         int
 	TickSpacing int
+	Factory     string
 }
 
 func (sql *Mysql) LoadPoolsInfo() []*PoolInfoRecord {
@@ -931,7 +932,7 @@ func (sql *Mysql) LoadPoolsInfo() []*PoolInfoRecord {
 		endId := ids[end]
 
 		go func(beginId int, endId int) {
-			querySQL := fmt.Sprintf("select pool, name, token0, token1, fee, tickSpacing from pools where id between %d and %d;", beginId, endId)
+			querySQL := fmt.Sprintf("select pool, name, token0, token1, fee, tickSpacing, factory from pools where id between %d and %d;", beginId, endId)
 			rows, err := sql.db.Query(querySQL)
 			if err != nil {
 				log.Warn("RonFi Mysql LoadPoolsInfo query data failed", "querySQL", querySQL, "err", err)
@@ -950,6 +951,7 @@ func (sql *Mysql) LoadPoolsInfo() []*PoolInfoRecord {
 					token1      string
 					fee         int
 					tickSpacing int
+					factory     string
 				)
 
 				if err = rows.Scan(&pool, &name, &token0, &token1, &fee, &tickSpacing); err == nil {
@@ -962,6 +964,7 @@ func (sql *Mysql) LoadPoolsInfo() []*PoolInfoRecord {
 							Token1:      token1,
 							Fee:         fee,
 							TickSpacing: tickSpacing,
+							Factory:     factory,
 						})
 				}
 			}
@@ -979,28 +982,30 @@ func (sql *Mysql) LoadPoolsInfo() []*PoolInfoRecord {
 }
 
 func (sql *Mysql) InsertPoolsInfo(newPoolsInfo []*PoolInfoRecord) int64 {
-	updateSQL := fmt.Sprintf("insert ignore into pools (pool, name, token0, token1, fee, tickSpacing) values ")
+	updateSQL := fmt.Sprintf("insert ignore into pools (pool, name, token0, token1, fee, tickSpacing, factory) values ")
 
 	length := len(newPoolsInfo)
 	for index, info := range newPoolsInfo {
 		if index == length-1 {
-			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", \"%s\", \"%s\", %d, %d) ",
+			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", \"%s\", \"%s\", %d, %d, \"%s\") ",
 				updateSQL,
 				info.Pool,
 				info.Name,
 				info.Token0,
 				info.Token1,
 				info.Fee,
-				info.TickSpacing)
+				info.TickSpacing,
+				info.Factory)
 		} else {
-			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", \"%s\", \"%s\", %d, %d), ",
+			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", \"%s\", \"%s\", %d, %d, \"%s\"), ",
 				updateSQL,
 				info.Pool,
 				info.Name,
 				info.Token0,
 				info.Token1,
 				info.Fee,
-				info.TickSpacing)
+				info.TickSpacing,
+				info.Factory)
 		}
 		index++
 	}
