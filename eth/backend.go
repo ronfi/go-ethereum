@@ -472,6 +472,10 @@ func (s *Ethereum) SyncMode() downloader.SyncMode {
 	return mode
 }
 
+func (s *Ethereum) GetTradingDexTxCh() chan types.Transactions {
+	return s.handler.GetTradingDexTxCh()
+}
+
 // Protocols returns all the currently configured
 // network protocols to start.
 func (s *Ethereum) Protocols() []p2p.Protocol {

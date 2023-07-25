@@ -5,8 +5,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool"
+	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
-	"sort"
 	"strings"
 )
 
@@ -14,7 +14,7 @@ import (
 type Backend interface {
 	BlockChain() *core.BlockChain
 	TxPool() *txpool.TxPool
-	//GetTradingDexTxCh() chan types.Transactions
+	GetTradingDexTxCh() chan types.Transactions
 	//RonBroadcastTransaction(tx *types.Transaction)
 }
 
@@ -78,110 +78,6 @@ type IAmountIO interface {
 	GetAmount() *AmountIO
 }
 
-type KnowledgeAmount struct {
-	Kid    int
-	Profit float32
-	AmountIO
-}
-
-func (in *KnowledgeAmount) Less(other *KnowledgeAmount) bool {
-	if other.AmountIn != nil {
-		if in.AmountIn != nil {
-			if other.AmountIn.Cmp(in.AmountIn) < 0 {
-				return false
-			}
-		} else {
-			return true
-		}
-	} else if other.AmountOut != nil {
-		if in.AmountOut != nil {
-			if other.AmountOut.Cmp(in.AmountOut) < 0 {
-				return false
-			}
-		} else {
-			return true
-		}
-	}
-
-	return true
-}
-
-type KnowledgeAmounts []*KnowledgeAmount
-
-func (klA KnowledgeAmounts) Sort() {
-	sort.Slice(klA, func(i, j int) bool {
-		return klA[i].Less(klA[j])
-	})
-}
-
-type AmountProfit struct {
-	KAmounts  KnowledgeAmounts
-	SumProfit float32
-}
-
-func NewAmountProfit(info IAmountIO, profit float32, kid int) *AmountProfit {
-	i := info.GetAmount()
-	kAmounts := make(KnowledgeAmounts, 0, 10)
-	af := &AmountProfit{
-		KAmounts:  kAmounts,
-		SumProfit: 0.0,
-	}
-	af.SumProfit = profit
-
-	kAmount := &KnowledgeAmount{
-		Kid:    kid,
-		Profit: profit,
-	}
-
-	// must not take info.amount directly! otherwise, the whole info is hard to recycle.
-	if i.AmountIn != nil {
-		kAmount.AmountIn = new(big.Int).Set(i.AmountIn)
-	} else if i.AmountOut != nil {
-		kAmount.AmountOut = new(big.Int).Set(i.AmountOut)
-	}
-
-	af.KAmounts = append(af.KAmounts, kAmount)
-	return af
-}
-
-// EvaluateAmount Evaluate whether this dex tx has an amount bigger than ever hunted
-func (in *AmountProfit) EvaluateAmount(param IAmountIO) (greenLight bool) {
-	greenLight = false
-	if len(in.KAmounts) < 1 {
-		return
-	}
-	minAm := in.KAmounts[0]
-	p := param.GetAmount()
-
-	if p.AmountIn != nil && minAm.AmountIn != nil {
-		if p.AmountIn.Cmp(minAm.AmountIn) >= 0 {
-			greenLight = true
-		}
-	} else if p.AmountOut != nil && minAm.AmountOut != nil {
-		if p.AmountOut.Cmp(minAm.AmountOut) >= 0 {
-			greenLight = true
-		}
-	}
-	return
-}
-
-func (in *AmountProfit) AddNewKnowledge(info IAmountIO, profit float32, kid int) {
-	kAmount := &KnowledgeAmount{
-		Kid:    kid,
-		Profit: profit,
-	}
-
-	i := info.GetAmount()
-	if i.AmountIn != nil {
-		kAmount.AmountIn = new(big.Int).Set(i.AmountIn)
-	} else if i.AmountOut != nil {
-		kAmount.AmountOut = new(big.Int).Set(i.AmountOut)
-	}
-
-	in.KAmounts = append(in.KAmounts, kAmount)
-	in.KAmounts.Sort()
-}
-
 type ProfitSorted struct {
 	Profit float32
 	LoopId common.Hash
@@ -189,69 +85,6 @@ type ProfitSorted struct {
 
 func (e *ProfitSorted) Less(other *ProfitSorted) bool {
 	return e.Profit > other.Profit
-}
-
-type LoopIdMapSorted struct {
-	LoopIdMap map[common.Hash]*AmountProfit
-	Profits   []*ProfitSorted
-}
-
-type RonKnowledgeMap map[string]*LoopIdMapSorted
-
-func (ronLidMap RonKnowledgeMap) Copy() RonKnowledgeMap {
-	newRonKnowledgeMap := make(RonKnowledgeMap)
-	for k, v := range ronLidMap {
-		newRecord := v.Copy()
-		newRonKnowledgeMap[k] = &newRecord
-	}
-
-	return newRonKnowledgeMap
-}
-
-func (ronLidMap RonKnowledgeMap) CancelKnowledge(kid int) bool {
-	marked := false
-
-	for _, v := range ronLidMap {
-		for loopId, af := range v.LoopIdMap {
-			found := false
-			for _, kAmount := range af.KAmounts {
-				if kAmount.Kid == kid {
-					found = true
-					marked = true
-					break
-				}
-			}
-
-			if found {
-				// if more than 1, delete first one; otherwise delete all
-				if len(af.KAmounts) > 1 {
-					currentMin := af.KAmounts[0]
-					af.KAmounts = af.KAmounts[1:]
-					af.SumProfit -= currentMin.Profit
-				} else {
-					//delete loopId here
-					delete(v.LoopIdMap, loopId)
-				}
-			}
-		}
-	}
-
-	return marked
-}
-
-func (li *LoopIdMapSorted) Copy() LoopIdMapSorted {
-	newLoopIdMap := make(map[common.Hash]*AmountProfit)
-	for k, v := range li.LoopIdMap {
-		newLoopIdMap[k] = v
-	}
-
-	newProfits := make([]*ProfitSorted, len(li.Profits))
-	copy(newProfits[:], li.Profits[:])
-
-	return LoopIdMapSorted{
-		LoopIdMap: newLoopIdMap,
-		Profits:   newProfits,
-	}
 }
 
 type JsonRawKnowledge struct {

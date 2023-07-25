@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"github.com/ethereum/go-ethereum/rpc"
 	"math/big"
 	"sort"
@@ -90,7 +89,7 @@ func (s *Stats) report(header *types.Header) {
 		}
 		receipt := receipts[txLookup.Index]
 
-		isDex, isObs := s.di.CheckIfObsTx(nil, tx, receipt.Logs, *tx.To())
+		isDex, isObs := s.di.CheckIfObsTx(tx, receipt.Logs, *tx.To())
 		if isDex {
 			if receipt.Status == 1 {
 				var token common.Address
@@ -114,7 +113,7 @@ func (s *Stats) report(header *types.Header) {
 				}
 
 				if found {
-					swapPairsInfo := s.di.ExtractSwapPairInfo(nil, nil, tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypeStats)
+					swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypeStats)
 					if len(swapPairsInfo) > 0 {
 						// stats dex volume
 						v, exist := s.dexTokensVol[token]
@@ -343,13 +342,6 @@ func (s *Stats) parseObs(
 						pair := dbLoop.Path[i]
 						s.obsPairStats.update(id, pair)
 					}
-
-					if swapLoop, ok := s.loopsIdMap[dbLoop.LoopId]; !ok {
-						s.loopsCol.notify(dbLoop)
-						s.loopsIdMap[dbLoop.LoopId] = &loops.SwapLoop{}
-					} else {
-						swapLoop.Count++
-					}
 				}
 			}
 
@@ -373,13 +365,6 @@ func (s *Stats) parseObs(
 					for i := 0; i < len(dbLoop.Path); i++ {
 						pair := dbLoop.Path[i]
 						s.obsPairStats.update(id, pair)
-					}
-
-					if swapLoop, ok := s.loopsIdMap[dbLoop.LoopId]; !ok {
-						s.loopsCol.notify(dbLoop)
-						s.loopsIdMap[dbLoop.LoopId] = &loops.SwapLoop{}
-					} else {
-						swapLoop.Count++
 					}
 				}
 			}

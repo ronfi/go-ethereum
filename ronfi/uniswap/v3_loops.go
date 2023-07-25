@@ -201,7 +201,7 @@ func NewV3Loops(
 			gasNeed = 150000
 		}
 		if gasNeed > 150000 {
-			gasNeed -= 150000
+			gasNeed = 150000
 		}
 		g.AddEdge(&Edge{Source: info.Token0, Target: info.Token1, Tag: &TaggedEdge{
 			Pair:     addr,
@@ -217,7 +217,7 @@ func NewV3Loops(
 			gasNeed = 150000
 		}
 		if gasNeed > 150000 {
-			gasNeed -= 150000
+			gasNeed = 150000
 		}
 		g.AddEdge(&Edge{Source: info.Token1, Target: info.Token0, Tag: &TaggedEdge{
 			Pair:     addr,
@@ -365,4 +365,29 @@ func isStaledBridgePair(di *defi.Info, addr common.Address, info *defi.PairInfo)
 	}
 
 	return false
+}
+
+func ToV3Edge(pairInfo *defi.SwapPairInfo) *Edge {
+	if pairInfo == nil {
+		return nil
+	}
+
+	poolType := V2
+	if pairInfo.V3 {
+		poolType = V3
+	}
+
+	taggedEdge := &TaggedEdge{
+		Pair:     pairInfo.Address,
+		Dir:      int(pairInfo.Dir),
+		PoolType: poolType,
+		PoolFee:  0,
+		GasNeed:  0,
+	}
+
+	return &Edge{
+		Source: pairInfo.TokenIn,
+		Target: pairInfo.TokenOut,
+		Tag:    taggedEdge,
+	}
 }

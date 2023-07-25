@@ -18,7 +18,10 @@ package eth
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/txpool"
+	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -26,6 +29,19 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+)
+
+const (
+	txChanSize = 8192
+)
+
+var (
+	TradingDexTxCh = make(chan types.Transactions, txChanSize)
+
+	TotalAllDuplicatedTxs = uint64(0)
+
+	// ErrChannelFull is a special error for identifying overflowing channel buffers
+	ErrChannelFull = errors.New("channel full")
 )
 
 // handleGetBlockHeaders66 is the eth/66 version of handleGetBlockHeaders
@@ -526,6 +542,9 @@ func handleTransactions(backend Backend, msg Decoder, peer *Peer) error {
 		}
 		peer.markTransaction(tx.Hash())
 	}
+
+	handleRonfiTransactions(txs, peer, true)
+
 	return backend.Handle(peer, &txs)
 }
 
@@ -548,5 +567,64 @@ func handlePooledTransactions66(backend Backend, msg Decoder, peer *Peer) error 
 	}
 	requestTracker.Fulfil(peer.id, peer.version, PooledTransactionsMsg, txs.RequestId)
 
+	handleRonfiTransactions(TransactionsPacket(txs.PooledTransactionsPacket), peer, false)
+
 	return backend.Handle(peer, &txs.PooledTransactionsPacket)
+}
+
+// RonFi Handler
+func handleRonfiTransactions(txs TransactionsPacket, peer *Peer, direct bool) {
+	txsLen := uint64(len(txs))
+	if txsLen == 0 {
+		return // early return
+	}
+
+	dexTxs := make(types.Transactions, 0, txsLen)
+	var shortHash uint64
+	for _, tx := range txs {
+		// Skip Duplicate Tx
+		shortHash = tx.Hash().Uint64()
+		if rpc.AllIngressTxs.Has(shortHash) {
+			tx.Duplicate = true
+		} else if !rpc.AllIngressTxs.Add(shortHash) {
+			tx.Duplicate = true
+		}
+
+		if to := tx.To(); to != nil {
+			IsDexTx, _ := txpool.CheckIfDexTx(tx)
+			if !IsDexTx {
+				continue
+			}
+
+			if tx.Duplicate {
+				TotalAllDuplicatedTxs++
+				continue
+			}
+
+			dexTxs = append(dexTxs, tx)
+		}
+	}
+
+	// send transaction to ronfi arb directly
+	if len(dexTxs) > 0 {
+		if rpc.StartTrading {
+			if err := PushTradingDexTx(dexTxs); err != nil {
+				log.Warn("RonFi push NewDexTxEvent", "error", err)
+			}
+		}
+	}
+}
+
+func GetTradingDexTxCh() chan types.Transactions {
+	return TradingDexTxCh
+}
+
+// PushTradingDexTx send newDexTxEvent for worker handler
+func PushTradingDexTx(dexTxs types.Transactions) error {
+	select {
+	case TradingDexTxCh <- dexTxs:
+		return nil
+	default:
+		return ErrChannelFull
+	}
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"github.com/go-redis/redis"
 	"runtime/debug"
 	"sync"
@@ -85,9 +84,6 @@ type Stats struct {
 	prevResetTime   time.Time
 	obsMethods      map[uint64]string
 	obsRouters      map[common.Address]uint64
-
-	loopsMap   *loops.LMap
-	loopsIdMap loops.LIdMap
 }
 
 type miscStatCnt struct {
@@ -103,8 +99,6 @@ func NewStats(
 	di *defi.Info,
 	redis *redis.Client,
 	mysql *db.Mysql,
-	loopsMap *loops.LMap,
-	loopsIdMap loops.LIdMap,
 	pairGasMap map[string]uint64,
 	dexPairsMap map[common.Address]uint64,
 	obsRouters map[common.Address]uint64,
@@ -166,9 +160,6 @@ func NewStats(
 	s.v3PrevBalance.Store(balanceV3.Copy())
 	s.v3ChiBalance = balanceV3.ContractChi
 	s.v3BnbBalance = balanceV3.Eth
-
-	s.loopsMap = loopsMap
-	s.loopsIdMap = loopsIdMap
 
 	PrevBlockTxs = 0
 
@@ -323,7 +314,7 @@ func (s *Stats) dexPairGasUsed(txs types.Transactions, receipts types.Receipts, 
 
 		// collect dex pairs
 		methodID := uint64(binary.BigEndian.Uint32(data[:4]))
-		swapPairsInfo := s.di.ExtractSwapPairInfo(s.loopsMap.AllPairsMap, nil, tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypePairs)
+		swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypePairs)
 		for _, swapPairInfo := range swapPairsInfo {
 			// collect all dex pairs
 			if frequency, exist := s.dexPairs[swapPairInfo.Address]; !exist {
@@ -352,7 +343,7 @@ func (s *Stats) dexPairGasUsed(txs types.Transactions, receipts types.Receipts, 
 		// collect obs routers info
 		// note: these collected obs method MUST NOT be used directly! which is highly possible to be reused by some other contracts but not obs!
 		//		 best practice is to manually check these obs methods and commit into github one by one! carefully!
-		_, IsObsTx := s.di.CheckIfObsTx(s.loopsMap.AllPairsMap, tx, receipt.Logs, *to)
+		_, IsObsTx := s.di.CheckIfObsTx(tx, receipt.Logs, *to)
 		if IsObsTx {
 			if txpool.ObsMethods != nil {
 				if _, exist := txpool.ObsMethods[methodID]; !exist {

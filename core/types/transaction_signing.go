@@ -20,7 +20,9 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"math/big"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -150,6 +152,27 @@ func Sender(signer Signer, tx *Transaction) (common.Address, error) {
 	}
 	tx.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil
+}
+
+func RonFiSender(signer Signer, tx *Transaction) (common.Address, bool, error) {
+	if sc := tx.from.Load(); sc != nil {
+		sigCache := sc.(sigCache)
+		// If the signer used to derive from in a previous
+		// call is not the same as used current, invalidate
+		// the cache.
+		if sigCache.signer.Equal(signer) {
+			return sigCache.from, true, nil
+		} else {
+			log.Warn("RonFi types.Sender signer not equal", "sigCache.signer", reflect.TypeOf(sigCache.signer), "signer", reflect.TypeOf(signer))
+		}
+	}
+
+	addr, err := signer.Sender(tx)
+	if err != nil {
+		return common.Address{}, false, err
+	}
+	tx.from.Store(sigCache{signer: signer, from: addr})
+	return addr, false, nil
 }
 
 // Signer encapsulates transaction signature handling. The name of this type is slightly

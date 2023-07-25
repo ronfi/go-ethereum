@@ -30,18 +30,10 @@ const (
 	RonFiExtractTypePairs
 )
 
-func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInfoMap, tx *types.Transaction, router common.Address, vLogs []*types.Log, eType RonFiExtractType) []*SwapPairInfo {
+func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address, vLogs []*types.Log, eType RonFiExtractType) []*SwapPairInfo {
 	var syncPairInfo *V2SyncInfo // there must have a 'sync' event before any 'swap'/'mint'/'burn' event.
 
 	swapPairsInfo := make([]*SwapPairInfo, 0, len(vLogs)/2)
-
-	pairsDb := make([]PairInfoMap, 0, 2)
-	if allPairsMap != nil {
-		pairsDb = append(pairsDb, allPairsMap)
-	}
-	if newPairsMap != nil {
-		pairsDb = append(pairsDb, newPairsMap)
-	}
 
 	for _, vlog := range vLogs {
 		var (
@@ -51,7 +43,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 			poolInfo                                *PoolInfo
 			key                                     string
 			dir                                     uint64
-			hasSwapPairInfo, knownPair, ok          bool
+			hasSwapPairInfo                         bool
 		)
 
 		if len(vlog.Topics) > 0 {
@@ -73,14 +65,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 				}
 			case state.V2MintEvent, state.V2BurnEvent:
 				if len(data) == 64 {
-					info, ok = checkIfPairInLoops(pairsDb, address)
-					if !ok { // not a known pair (i.e. none loops contain this pair), nothing we can do.
-						if eType == RonFiExtractTypeStats {
-							info = di.GetPairInfo(address)
-						}
-						continue
-					}
-
+					info = di.GetPairInfo(address)
 					if eType != RonFiExtractTypeHunting || info == nil {
 						continue
 					}
@@ -119,7 +104,6 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 							Key:          key,
 							V3:           false,
 							BothBriToken: info.BothBriToken,
-							KnownPair:    true,
 							TokenIn:      tokenIn,
 							TokenOut:     tokenOut,
 							KeyToken:     info.KeyToken,
@@ -177,7 +161,6 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 							Key:          key,
 							V3:           false,
 							BothBriToken: info.BothBriToken,
-							KnownPair:    true,
 							TokenIn:      tokenIn,
 							TokenOut:     tokenOut,
 							KeyToken:     info.KeyToken,
@@ -239,7 +222,6 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 						Key:          key,
 						V3:           true,
 						BothBriToken: false,
-						KnownPair:    false,
 						Sender:       sender,
 						To:           to,
 						TokenIn:      tokenIn,
@@ -258,15 +240,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 				}
 			case state.V2SwapEvent:
 				if len(data) == 128 && len(vlog.Topics) == 3 {
-					info, ok = checkIfPairInLoops(pairsDb, address)
-					if ok {
-						knownPair = true
-					} else {
-						if eType != RonFiExtractTypeHunting { // if not hunting, here is 2nd chance to get pair token info, via rpc api.
-							//log.Info("RonFi pair without loops", "dexTx", tx.Hash().String(), "pair", string(address.HexNoChecksum()), "event", state.EventName(topic0))
-							info = di.GetPairInfo(address)
-						}
-					}
+					info = di.GetPairInfo(address)
 					if info == nil { // not a known pair (i.e. none loops contain this pair, and rpc query fails too), nothing we can do.
 						continue
 					}
@@ -332,7 +306,6 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 					key,
 					false,
 					info.BothBriToken,
-					knownPair,
 					sender,
 					to,
 					tokenIn,
@@ -355,7 +328,7 @@ func (di *Info) ExtractSwapPairInfo(allPairsMap PairInfoMap, newPairsMap PairInf
 	return swapPairsInfo
 }
 
-func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLogs []*types.Log, router common.Address) (isDex bool, isObs bool) {
+func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router common.Address) (isDex bool, isObs bool) {
 	to := tx.To()
 	if to == nil {
 		return
@@ -379,7 +352,7 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 		return
 	}
 
-	swapPairsInfo := di.ExtractSwapPairInfo(allPairsMap, nil, tx, router, vLogs, RonFiExtractTypeStats)
+	swapPairsInfo := di.ExtractSwapPairInfo(tx, router, vLogs, RonFiExtractTypeStats)
 	if len(swapPairsInfo) > 0 {
 		isDex = true
 		isObs = false
@@ -415,7 +388,7 @@ func (di *Info) CheckIfObsTx(allPairsMap PairInfoMap, tx *types.Transaction, vLo
 
 func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router common.Address) (float64, bool) {
 	v3Loop := false
-	swapPairsInfo := di.ExtractSwapPairInfo(nil, nil, tx, router, vLogs, RonFiExtractTypeStats)
+	swapPairsInfo := di.ExtractSwapPairInfo(tx, router, vLogs, RonFiExtractTypeStats)
 	for _, pairInfo := range swapPairsInfo {
 		if pairInfo.V3 {
 			v3Loop = true

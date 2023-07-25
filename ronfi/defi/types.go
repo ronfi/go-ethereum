@@ -115,7 +115,6 @@ type SwapPairInfo struct {
 	Key          string
 	V3           bool
 	BothBriToken bool
-	KnownPair    bool
 	Sender       common.Address
 	To           common.Address
 	TokenIn      common.Address

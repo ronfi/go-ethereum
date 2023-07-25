@@ -19,6 +19,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -159,4 +160,47 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
 	return applyTransaction(msg, config, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
+}
+
+// RonFi methods
+// return value:
+// 1: applySuccess
+// 2: revert?
+// 3: error message
+func applyRonfiTransaction(msg *Message, gp *GasPool, statedb *state.StateDB, evm *vm.EVM, tx *types.Transaction) (bool, bool, uint64, string) {
+	// Create a new context to be used in the EVM environment.
+	txContext := NewEVMTxContext(msg)
+	evm.Reset(txContext, statedb)
+
+	// Apply the transaction to the current state (included in the env).
+
+	if result, err := NewStateTransition(evm, msg, gp).CHRonFiTransitionDb(); err != nil {
+		return false, true, uint64(0), err.Error() // (apply fail, N/A)
+	} else {
+		if result.Failed() {
+			revertMsg := fmt.Sprintf("execution reverted: %v", string(result.ReturnData))
+			// If the result contains a revert reason, try to unpack and return it.
+			revertData := result.Revert()
+			if len(revertData) > 0 {
+				reason, errUnpack := abi.UnpackRevert(revertData)
+				if errUnpack == nil {
+					revertMsg = fmt.Sprintf("execution reverted: %v", reason)
+				}
+			}
+			return true, true, result.UsedGas, revertMsg // (apply success, transaction fail or not)
+		} else {
+			return true, false, result.UsedGas, "execute succeed" // (apply success, transaction fail or not)
+		}
+	}
+}
+
+func ApplyRonfiTransaction(config *params.ChainConfig, bc ChainContext, author common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, cfg vm.Config) (bool, bool, uint64, string) {
+	msg, err := TransactionToMessage(tx, types.MakeSigner(config, header.Number, header.Time), header.BaseFee)
+	if err != nil {
+		return false, true, uint64(0), err.Error()
+	}
+	// Create a new context to be used in the EVM environment
+	blockContext := NewEVMBlockContext(header, bc, &author)
+	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
+	return applyRonfiTransaction(msg, gp, statedb, vmenv, tx)
 }

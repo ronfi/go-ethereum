@@ -172,16 +172,6 @@ func (di *Info) GetPoolInfo(address common.Address) (info *PoolInfo) {
 	return
 }
 
-func (di *Info) GetV3Factory(address common.Address) *common.Address {
-	if inst, err := v3pool.NewV3pool(address, di.client); err == nil {
-		if factory, err := inst.Factory(nil); err == nil {
-			return &factory
-		}
-	}
-
-	return nil
-}
-
 func (di *Info) GetV3SqrtPriceX96(address common.Address) (*big.Int, error) {
 	if inst, err := v3pool.NewV3pool(address, di.client); err == nil {
 		if slot0, err := inst.Slot0(nil); err == nil {

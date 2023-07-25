@@ -609,3 +609,7 @@ func (h *handler) txBroadcastLoop() {
 		}
 	}
 }
+
+func (h *handler) GetTradingDexTxCh() chan types.Transactions {
+	return eth.GetTradingDexTxCh()
+}

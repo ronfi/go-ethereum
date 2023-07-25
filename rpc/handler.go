@@ -36,9 +36,11 @@ const (
 )
 
 var (
-	StartTrading = false
-	LogPairGas   = false
-	LogPairUse   = false
+	StartTrading  = false
+	LogPairGas    = false
+	LogPairUse    = false
+	FilterDupTxs  = true
+	LogSkipReason = false
 
 	// AllIngressTxs Set of transaction received from all peers
 	AllIngressTxs = cmap.NewMapsetMini(256, MaxAllIngressKnownTxs)
