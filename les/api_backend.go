@@ -342,3 +342,6 @@ func (b *LesApiBackend) StartStats() {
 
 func (b *LesApiBackend) StopStats() {
 }
+
+func (b *LesApiBackend) StartArbing(dryRun bool, minHuntingProfit int) {
+}

@@ -416,3 +416,7 @@ func (b *EthAPIBackend) StartStats() {
 func (b *EthAPIBackend) StopStats() {
 	b.eth.StopStats()
 }
+
+func (b *EthAPIBackend) StartArbing(dryRun bool, minHuntingProfit int) {
+	b.eth.StartArbing(dryRun, minHuntingProfit)
+}

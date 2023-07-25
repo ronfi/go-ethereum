@@ -8,9 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/stats"
+	"github.com/ethereum/go-ethereum/ronfi/trading"
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/go-redis/redis"
+	"os"
+	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,9 +35,9 @@ type RonArbiter struct {
 	chainConfig       *params.ChainConfig
 	startCh           chan string
 	stopCh            chan struct{}
+	worker            *trading.Worker
 	stats             *stats.Stats
 	oracleInitialized bool
-	running           bool
 	dryRun            bool
 	minHuntingProfit  float64 // Trigger the hunting if profitInToken >= txFeeInToken*this
 	v3LoopsDb         *uniswap.V3Loops
@@ -63,7 +66,6 @@ func New(eth rcommon.Backend, chainConfig *params.ChainConfig) *RonArbiter {
 		chainConfig: chainConfig,
 		startCh:     make(chan string),
 		stopCh:      make(chan struct{}),
-		running:     false,
 		dryRun:      false,
 	}
 
@@ -141,7 +143,7 @@ func (r *RonArbiter) ReloadLoops() {
 	}
 }
 
-func (r *RonArbiter) Start(dryRun bool, minHuntingProfit int, totalArb int, thisIndex int, maxMatchedLoops int, maxCopyHighProfit int, doubleCopy bool, checkArbTx bool, skipElse bool, debug bool, highProfitMin int, secondChance bool, freeze bool, gamma int, isP2pHunting bool, p2pHuntingTopN int, v3Hunting bool) {
+func (r *RonArbiter) Start(dryRun bool, minHuntingProfit int) {
 	log.Info("RonFi arb start",
 		"dryRun", dryRun,
 		"minHuntingProfit", minHuntingProfit,
@@ -155,13 +157,11 @@ func (r *RonArbiter) Start(dryRun bool, minHuntingProfit int, totalArb int, this
 
 func (r *RonArbiter) Stop() {
 	log.Info("RonFi arb Stop")
-	if r.running {
-		r.stopCh <- struct{}{}
-	}
+	r.stopCh <- struct{}{}
 }
 
 func (r *RonArbiter) Arbing() bool {
-	return r.running
+	return rpc.StartTrading
 }
 
 func (r *RonArbiter) StartStats() {
@@ -231,11 +231,27 @@ func (r *RonArbiter) mainLoop() {
 			}
 
 		case <-r.startCh:
-			rpc.StartTrading = true
+			if !rpc.StartTrading {
+				r.worker = trading.NewWorker(r.eth, r.chainConfig, r.client, r.di, r.dryRun, r.minHuntingProfit)
+				if pri := os.Getenv("EXECUTOR_PRIVATE_KEY"); len(pri) < 64 {
+					log.Warn("RonFi mainLoop fail to start. empty or wrong private key")
+				} else if !r.worker.Init(pri, r.pairGasMap, r.v3LoopsDb) {
+					log.Error("RonFi Worker Init Failed!!!")
+				} else {
+					log.Info("RonFi mainLoop start", "CPU number", runtime.NumCPU(), "GoMaxProc", runtime.GOMAXPROCS(0))
+					rpc.StartTrading = true
+				}
+			}
 			break
 
 		case <-r.stopCh:
-			rpc.StartTrading = false
+			if rpc.StartTrading {
+				r.worker.UnInit()
+				r.worker = nil
+				log.Info("RonFi mainLoop stop")
+
+				rpc.StartTrading = false
+			}
 			break
 		}
 	}

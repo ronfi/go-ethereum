@@ -7,7 +7,6 @@ import (
 	"fmt"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	v2 "github.com/ethereum/go-ethereum/ronfi/uniswap/v2"
 	v3 "github.com/ethereum/go-ethereum/ronfi/uniswap/v3"
@@ -108,20 +107,6 @@ var (
 	ErrChannelFull = errors.New("channel full")
 )
 
-type MaxProfitableAmountInLoop struct {
-	maxProfitableAmountIn MaxProfitableAmountIn
-	kid                   int
-	loop                  *loops.SwapLoop
-	gasNeed               uint64
-	netProfitInBnb        float64
-	status                bool
-}
-
-type HuntingRes struct {
-	firstChanceRes bool
-	arbTx          *types.Transaction
-}
-
 type ProfitDetail struct {
 	loopName         string
 	targetToken      common.Address
@@ -144,15 +129,6 @@ func (p ProfitDetails) Less(i, j int) bool {
 }
 func (p ProfitDetails) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
-}
-
-type HuntingInfo struct {
-	tx               *types.Transaction
-	pairId           int
-	pairInfo         *defi.SwapPairInfo
-	firstChance      bool
-	handlerStartTime mclock.AbsTime
-	profit           *ProfitDetail
 }
 
 type Worker struct {
@@ -213,8 +189,7 @@ type Worker struct {
 	huntingPairs  int
 	logHuntingTxs bool
 
-	numCPU      int
-	huntingChan chan *HuntingInfo
+	numCPU int
 }
 
 func NewWorker(eth rcommon.Backend, chainConfig *params.ChainConfig, client *ethclient.Client, di *defi.Info, dryRun bool, minHuntingProfit float64) *Worker {
@@ -258,7 +233,6 @@ func (w *Worker) Init(executorPrivateKey string, pairGasMap map[string]uint64, v
 	w.pairGasMap = pairGasMap
 	w.v3LoopsDb = v3LoopsDb
 
-	w.huntingChan = make(chan *HuntingInfo, 256)
 	w.stateDbsCopyCh = make(chan struct{}, 128)
 	w.startTime = mclock.Now()
 	w.currentBlockNum = w.chain.CurrentBlock().Number.Uint64()
