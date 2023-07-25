@@ -269,6 +269,7 @@ func TestMysql_InsertPoolsInfo(t *testing.T) {
 			"0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
 			500,
 			10,
+			"0x0000000000000000000000000000000000000000",
 		},
 	}
 

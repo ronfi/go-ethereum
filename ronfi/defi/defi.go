@@ -404,6 +404,20 @@ func (di *Info) GetAllPairInfo() map[common.Address]*PairInfo {
 	return allPairInfoCopy
 }
 
+func (di *Info) GetAllPoolInfo() map[common.Address]*PoolInfo {
+	allPoolsInfoCopy := make(map[common.Address]*PoolInfo)
+	di.lock.RLock()
+	for k, v := range di.poolsInfo {
+		allPoolsInfoCopy[k] = v
+	}
+	for k, v := range di.newPoolsInfo {
+		allPoolsInfoCopy[k] = v
+	}
+	di.lock.RUnlock()
+
+	return allPoolsInfoCopy
+}
+
 func (di *Info) GetAllTokenInfo() map[common.Address]*TokenInfo {
 	allTokenInfoCopy := make(map[common.Address]*TokenInfo)
 	di.lock.RLock()

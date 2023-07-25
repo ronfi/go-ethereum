@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
+	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
-	"github.com/ethereum/go-ethereum/ronfi/mysql"
 	common2 "github.com/ethereum/go-ethereum/ronfi/uniswap/common"
 	v2 "github.com/ethereum/go-ethereum/ronfi/uniswap/v2"
 	v3 "github.com/ethereum/go-ethereum/ronfi/uniswap/v3"
@@ -40,8 +40,7 @@ func TestUniswap_Minimizer(t *testing.T) {
 }
 
 func TestUniswap_CycleSwap(t *testing.T) {
-	//client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
-	client, err := ethclient.Dial("https://nd-814-711-835.p2pify.com/049f42c7290c310495b6940701e2ae14")
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
 	if err != nil {
 		t.Fatal("TestV3_Swap dial eth client failed!")
 	}
@@ -61,9 +60,9 @@ func TestUniswap_CycleSwap(t *testing.T) {
 		DbPort: "3306",
 		DbUser: "root",
 		DbPass: "rkdb",
-		DbData: "rkdb",
+		DbData: "rkdb_eth",
 	}
-	mysqlInst := mysql.NewMysql(conf)
+	mysqlInst := db.NewMysql(conf)
 	if mysqlInst == nil {
 		t.Fatalf("TestV3_Swap NewMysql failed!")
 	}
@@ -114,7 +113,7 @@ func TestUniswap_CycleSwap(t *testing.T) {
 }
 
 func TestUniswap_CalculateMaxInAmount(t *testing.T) {
-	client, err := ethclient.Dial("https://nd-814-711-835.p2pify.com/049f42c7290c310495b6940701e2ae14")
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
 	if err != nil {
 		t.Fatal("TestUniswap_CalculateMaxInAmount dial eth client failed!")
 	}
@@ -134,9 +133,9 @@ func TestUniswap_CalculateMaxInAmount(t *testing.T) {
 		DbPort: "3306",
 		DbUser: "root",
 		DbPass: "rkdb",
-		DbData: "rkdb",
+		DbData: "rkdb_eth",
 	}
-	mysqlInst := mysql.NewMysql(conf)
+	mysqlInst := db.NewMysql(conf)
 	if mysqlInst == nil {
 		t.Fatalf("TestUniswap_CalculateMaxInAmount NewMysql failed!")
 	}
@@ -180,4 +179,83 @@ func TestUniswap_CalculateMaxInAmount(t *testing.T) {
 	arb.AutoUpdate(v3States)
 	maxIn := arb.CalculateMaxInAmount(common2.StrToBigInt("1000000000000000000"), 0)
 	t.Logf("maxIn: %v\n", maxIn)
+}
+
+func TestUniswap_NewV3Loops(t *testing.T) {
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
+	if err != nil {
+		t.Fatal("TestUniswap_NewV3Loops dial eth client failed!")
+	}
+
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
+
+	conf := rcommon.MysqlConfig{
+		DbHost: "176.9.120.196",
+		DbPort: "3306",
+		DbUser: "root",
+		DbPass: "rkdb",
+		DbData: "rkdb_eth",
+	}
+	mysqlInst := db.NewMysql(conf)
+	if mysqlInst == nil {
+		t.Fatalf("TestUniswap_NewV3Loops NewMysql failed!")
+	}
+
+	di := defi.NewInfo(client, mysqlInst)
+	if di == nil {
+		t.Fatalf("TestUniswap_NewV3Loops NewInfo failed!")
+	}
+
+	pairsInfo := make(defi.PairInfoMap)
+	for address, info := range di.GetAllPairInfo() {
+		if _, ok := rcommon.ValidV2FactsMap[info.Factory]; ok {
+			pairsInfo[address] = info
+		}
+	}
+	t.Logf("pairsInfo: %v\n", len(pairsInfo))
+
+	poolsInfo := make(map[common.Address]*defi.PoolInfo)
+	for address, info := range di.GetAllPoolInfo() {
+		if _, ok := rcommon.ValidV3FactsMap[info.Factory]; ok {
+			poolsInfo[address] = info
+		}
+	}
+	t.Logf("poolsInfo: %v\n", len(poolsInfo))
+
+	tokensInfo := di.GetAllTokenInfo()
+	t.Logf("tokensInfo: %v\n", len(tokensInfo))
+
+	pairGasMap := mysqlInst.LoadPairGas()
+	t.Logf("pairGasMap: %v\n", len(pairGasMap))
+
+	v3Loops := NewV3Loops(di, pairsInfo, poolsInfo, tokensInfo, pairGasMap)
+	if v3Loops == nil {
+		t.Fatalf("TestUniswap_NewV3Loops NewV3Loops failed!")
+	}
+
+	taggedEdge := &TaggedEdge{
+		Pair:     common.HexToAddress("0xD9F3a5A0e7499149538cDEE8B804a5Ac4f4944Fc"),
+		Dir:      1,
+		PoolType: V2,
+		GasNeed:  500000,
+	}
+	edge := &Edge{
+		Source: common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),
+		Target: common.HexToAddress("0x8185Bc4757572Da2a610f887561c32298f1A5748"),
+		Tag:    taggedEdge,
+	}
+
+	arbs := v3Loops.FindLoops(edge)
+	if arbs == nil {
+		t.Fatalf("TestUniswap_NewV3Loops FindLoops failed!")
+	} else {
+		t.Logf("total %v arbs found!\n", len(arbs))
+		for _, arb := range arbs {
+			t.Logf("arb: %v\n", arb.String())
+		}
+	}
 }

@@ -156,7 +156,7 @@ func (g *Graph) FindCyclesWithDedicatedEdges(dedicatedEdges []*Edge, hops int) [
 	// filter same Pair cycles and non-tradable token cycles
 	filteredCycles := make([]Cycle, 0, len(cycles))
 	for _, cycle := range cycles {
-		if !cycle.HasDupPair() && cycle.CheckIfV3OnHeadTail() && cycle.CheckIfTradableInputToken() {
+		if !cycle.HasDupPair() && cycle.CheckIfTradableInputToken() {
 			filteredCycles = append(filteredCycles, cycle)
 		}
 	}

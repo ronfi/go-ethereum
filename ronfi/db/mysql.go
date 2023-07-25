@@ -954,7 +954,7 @@ func (sql *Mysql) LoadPoolsInfo() []*PoolInfoRecord {
 					factory     string
 				)
 
-				if err = rows.Scan(&pool, &name, &token0, &token1, &fee, &tickSpacing); err == nil {
+				if err = rows.Scan(&pool, &name, &token0, &token1, &fee, &tickSpacing, &factory); err == nil {
 					currentRecords = append(
 						currentRecords,
 						&PoolInfoRecord{
