@@ -212,7 +212,8 @@ func TestUniswap_NewV3Loops(t *testing.T) {
 
 	pairsInfo := make(defi.PairInfoMap)
 	for address, info := range di.GetAllPairInfo() {
-		if _, ok := rcommon.ValidV2FactsMap[info.Factory]; ok {
+		if pf, ok := rcommon.ValidV2FactsMap[info.Factory]; ok {
+			info.Fee = pf
 			pairsInfo[address] = info
 		}
 	}

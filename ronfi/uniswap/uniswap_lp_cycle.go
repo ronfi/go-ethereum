@@ -40,13 +40,13 @@ func (path V3ArbPath) String() string {
 	for i, pool := range path {
 		if i != len(path)-1 {
 			if pool.PoolType == V2 {
-				str += fmt.Sprintf("%s (v2) -> ", pool.PoolAddr.Hex())
+				str += fmt.Sprintf("%s (v2, pf: %v) -> ", pool.PoolAddr.Hex(), pool.PoolFee)
 			} else {
 				str += fmt.Sprintf("%s (v3) -> ", pool.PoolAddr.Hex())
 			}
 		} else {
 			if pool.PoolType == V2 {
-				str += fmt.Sprintf("%s (v2)", pool.PoolAddr.Hex())
+				str += fmt.Sprintf("%s (v2, pf: %v)", pool.PoolAddr.Hex(), pool.PoolFee)
 			} else {
 				str += fmt.Sprintf("%s (v3)", pool.PoolAddr.Hex())
 			}

@@ -13,6 +13,7 @@ type TaggedEdge struct {
 	Pair     common.Address
 	Dir      int
 	PoolType PoolType
+	PoolFee  uint64
 	GasNeed  uint64
 }
 
@@ -206,6 +207,7 @@ func NewV3Loops(
 			Pair:     addr,
 			Dir:      0,
 			PoolType: V2,
+			PoolFee:  info.Fee,
 			GasNeed:  gasNeed,
 		}})
 
@@ -221,6 +223,7 @@ func NewV3Loops(
 			Pair:     addr,
 			Dir:      1,
 			PoolType: V2,
+			PoolFee:  info.Fee,
 			GasNeed:  gasNeed,
 		}})
 	}

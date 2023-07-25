@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/loops"
 	"github.com/ethereum/go-ethereum/ronfi/stats"
+	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/go-redis/redis"
 	"time"
@@ -55,6 +56,7 @@ type RonArbiter struct {
 	// Gamma = 0.001503383459709 // γ = ( 1-β ) / β
 	loopsMap           *loops.LMap // RonFi swaploops
 	newLoopsMap        *loops.LMap // RonFi New Swap Loops, notified from obs-monitor.
+	v3LoopsDb          *uniswap.V3Loops
 	loopsIdMap         loops.LIdMap
 	pairGasMap         map[string]uint64 // the gas required for a pair swap (key: pair+dir)
 	flashNokPairs      map[common.Address]uint64
@@ -172,7 +174,25 @@ func (r *RonArbiter) ReloadLoops() {
 		r.newLoopsMap = loops.NewDefaultLoopsMap() // due to all loops already saved in mysql, so after reload we don't need keep newLoopsMap.
 		r.obsRouters = r.mysql.LoadObsRouters()
 		r.obsMethods = r.mysql.LoadObsMethods()
-		//r.eth.TxPool().SetObs(r.obsRouters, r.obsMethods)
+		r.eth.TxPool().SetObs(r.obsRouters, r.obsMethods)
+
+		pairsInfo := make(defi.PairInfoMap)
+		for address, info := range r.di.GetAllPairInfo() {
+			if pf, ok := rcommon.ValidV2FactsMap[info.Factory]; ok {
+				info.Fee = pf
+				pairsInfo[address] = info
+			}
+		}
+
+		poolsInfo := make(map[common.Address]*defi.PoolInfo)
+		for address, info := range r.di.GetAllPoolInfo() {
+			if _, ok := rcommon.ValidV3FactsMap[info.Factory]; ok {
+				poolsInfo[address] = info
+			}
+		}
+
+		tokensInfo := r.di.GetAllTokenInfo()
+		r.v3LoopsDb = uniswap.NewV3Loops(r.di, pairsInfo, poolsInfo, tokensInfo, r.pairGasMap)
 
 		log.Info("RonFi arb Reload Loops and White Pairs success")
 	}
