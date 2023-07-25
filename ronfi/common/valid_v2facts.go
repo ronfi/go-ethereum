@@ -3,7 +3,7 @@ package common
 import "github.com/ethereum/go-ethereum/common"
 
 var (
-	ValidV2FactsMap = map[common.Address]int{
+	ValidV2FactsMap = map[common.Address]uint64{
 		common.HexToAddress("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"): 30,
 		common.HexToAddress("0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac"): 30,
 		common.HexToAddress("0x1e895bFe59E3A5103e8B7dA3897d1F2391476f3c"): 100,

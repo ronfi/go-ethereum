@@ -115,16 +115,27 @@ func parseObs5Input(di *defi.Info, input []byte) (*ObsParsedResult, *db.DBLoop, 
 				toDbLoop = false
 				break
 			} else {
-				token0 = poolInfo.Token0
-				token1 = poolInfo.Token1
-				v2ResIndex = 0xFF
-				v3Pair = true
+				if _, ok := rcommon.ValidV3FactsMap[pair]; !ok {
+					toDbLoop = false
+					break
+				} else {
+					token0 = poolInfo.Token0
+					token1 = poolInfo.Token1
+					v2ResIndex = 0xFF
+					v3Pair = true
+				}
 			}
 		} else {
-			token0 = pairInfo.Token0
-			token1 = pairInfo.Token1
-			v2ResIndex = pairInfo.Index
-			poolFee[i] = 30
+			if pf, ok := rcommon.ValidV2FactsMap[pair]; !ok {
+				toDbLoop = false
+				break
+			} else {
+				token0 = pairInfo.Token0
+				token1 = pairInfo.Token1
+				v2ResIndex = pairInfo.Index
+				poolFee[i] = pf
+			}
+
 		}
 
 		if toDbLoop {
@@ -219,16 +230,26 @@ func parseObs6Input(di *defi.Info, input []byte) (*ObsParsedResult, *db.DBLoop, 
 				toDbLoop = false
 				break
 			} else {
-				token0 = poolInfo.Token0
-				token1 = poolInfo.Token1
-				v2ResIndex = 0xFF
-				v3Pair = true
+				if _, ok := rcommon.ValidV3FactsMap[pair]; !ok {
+					toDbLoop = false
+					break
+				} else {
+					token0 = poolInfo.Token0
+					token1 = poolInfo.Token1
+					v2ResIndex = 0xFF
+					v3Pair = true
+				}
 			}
 		} else {
-			token0 = pairInfo.Token0
-			token1 = pairInfo.Token1
-			v2ResIndex = pairInfo.Index
-			poolFee[i] = 30
+			if pf, ok := rcommon.ValidV2FactsMap[pair]; !ok {
+				toDbLoop = false
+				break
+			} else {
+				token0 = pairInfo.Token0
+				token1 = pairInfo.Token1
+				v2ResIndex = pairInfo.Index
+				poolFee[i] = pf
+			}
 		}
 
 		dir := uint64(0)
