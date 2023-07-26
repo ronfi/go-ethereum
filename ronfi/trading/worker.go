@@ -291,10 +291,11 @@ func (w *Worker) Init(executorPrivateKey string, pairGasMap map[string]uint64, v
 
 	balance := w.di.GetAllBalance(w.executorAddress, false)
 	log.Info("RonFi Init", "Initial Executor Eth", balance.Eth, "Initial Contract Balance in USD", balance.ContractTotal)
-	if balance.Eth == 0 || balance.ContractTotal == 0 {
-		log.Error("RonFi wallet initial Eth and/or contract initial balance is zero")
-		return false
-	}
+	//if balance.Eth == 0 || balance.ContractTotal == 0 {
+	//	log.Error("RonFi wallet initial Eth and/or contract initial balance is zero")
+	//	return false
+	//}
+
 	w.initialBalance.Store(balance.Copy())
 	w.prevBalance.Store(balance)
 	w.chiBalance = balance.ContractChi
