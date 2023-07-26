@@ -873,6 +873,10 @@ func (s *BlockChainAPI) StartArbing(dryRun bool, minHuntingProfit int) {
 	s.b.StartArbing(dryRun, minHuntingProfit)
 }
 
+func (s *BlockChainAPI) StopArbing() {
+	s.b.StopArbing()
+}
+
 // OverrideAccount indicates the overriding fields of account during the execution
 // of a message call.
 // Note, state and stateDiff can't be specified at the same time. If state is

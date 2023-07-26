@@ -420,3 +420,7 @@ func (b *EthAPIBackend) StopStats() {
 func (b *EthAPIBackend) StartArbing(dryRun bool, minHuntingProfit int) {
 	b.eth.StartArbing(dryRun, minHuntingProfit)
 }
+
+func (b *EthAPIBackend) StopArbing() {
+	b.eth.StopArbing()
+}

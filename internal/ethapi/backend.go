@@ -75,6 +75,7 @@ type Backend interface {
 	StartStats()
 	StopStats()
 	StartArbing(dryRun bool, minHuntingProfit int)
+	StopArbing()
 
 	// Transaction pool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error

@@ -544,6 +544,13 @@ func (s *Ethereum) StartArbing(dryRun bool, minHuntingProfit int) {
 	}
 }
 
+// StopArbing start RonFi arbitrage service.
+func (s *Ethereum) StopArbing() {
+	if s.IsArbing() {
+		s.ronArbiter.Stop()
+	}
+}
+
 // StartStats Start RonFi Stats Service
 func (s *Ethereum) StartStats() {
 	log.Info("RonFi stats start")
