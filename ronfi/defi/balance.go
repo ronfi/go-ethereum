@@ -3,6 +3,7 @@ package defi
 import (
 	"context"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	erc20token "github.com/ethereum/go-ethereum/ronfi/contracts/contract_erc20"
@@ -93,9 +94,16 @@ func (di *Info) tokenBalance(token, account common.Address) *big.Int {
 	return nil
 }
 
-func (di *Info) ronTokensBalance(token common.Address, v3 bool) *big.Int {
+func (di *Info) ronTokensBalance(token common.Address) *big.Int {
 	if di == nil {
 		return nil
+	} else {
+		// todo: query balance in contract
+		//if balance := di.tokenBalance(token, rcommon.RON_V3_SWAP_ADDRESS); balance == nil {
+		//	log.Error("RonFi GetRonTokensBalance on RonSwapV3 failed!")
+		//} else {
+		//	return balance
+		//}
 	}
 
 	return nil
@@ -103,6 +111,84 @@ func (di *Info) ronTokensBalance(token common.Address, v3 bool) *big.Int {
 
 func (di *Info) GetAllBalance(executors []common.Address, v3 bool) RonFiBalance {
 	ronBalance := RonFiBalance{}
+
+	totalValue := 0.0
+	contractValue := 0.0
+
+	// Eth in All Executors Wallet
+	{
+		lowBalanceExecutors := 0
+		allLowBalanceExecutorsEth := big.NewInt(0)
+		allExecutorsEth := big.NewInt(0)
+		for _, executor := range executors {
+			if balance := di.balance(executor); balance == nil {
+				log.Warn("RonFi Get Executor Balance Failed", "Executor", rcommon.AbbrHexString(executor.String()))
+			} else {
+				if balance.Cmp(EthLowBalanceWarningAmount) < 0 {
+					lowBalanceExecutors++
+					if balance.Cmp(EthLowBalanceUrgentAmount) < 0 {
+						log.Warn("RonFi arb low balance", "executor", rcommon.AbbrHexString(executor.String()), "ETH Balance", toEth(balance))
+					}
+					allLowBalanceExecutorsEth = new(big.Int).Add(allLowBalanceExecutorsEth, balance)
+				}
+				allExecutorsEth = new(big.Int).Add(allExecutorsEth, balance)
+			}
+		}
+		ronBalance.Eth = rcommon.ToFloat(allExecutorsEth, 18)
+		if lowBalanceExecutors > 0 {
+			log.Warn("RonFi arb low balance", "executors", lowBalanceExecutors, "Average ETH Balance", toEth(new(big.Int).Div(allLowBalanceExecutorsEth, big.NewInt(int64(lowBalanceExecutors)))))
+		}
+	}
+	totalValue += ronBalance.Eth
+
+	for token, symbol := range rcommon.TradableTokens {
+		if balance := di.ronTokensBalance(token); balance == nil {
+			log.Warn("RonFi GetAllBalance GetRonTokensBalance failed", "token", symbol)
+		} else {
+			balanceInFloat := rcommon.ToFloat(balance, 18)
+			switch symbol {
+			case "WETH":
+				ronBalance.ContractEth = balanceInFloat
+			case "BTCB":
+				ronBalance.ContractBtc = balanceInFloat
+			case "DAI":
+				fallthrough
+			case "USDC":
+				fallthrough
+			case "USDT":
+				fallthrough
+			case "BUSD":
+				ronBalance.ContractUsdx += balanceInFloat
+			default:
+				log.Warn("RonFi new trading token?", "token", token, "token", symbol)
+			}
+			log.Info("RonFi arb GetAllBalance", "Token", symbol, "Balance", balanceInFloat)
+
+			priceInFloat := GetTradingTokenPrice(token)
+			contractValue += balanceInFloat / priceInFloat
+		}
+	}
+
+	totalValue += contractValue
+
+	totalValueInUsd := totalValue * GetTradingTokenPrice(rcommon.USDC)
+	contractValueInUsd := contractValue * GetTradingTokenPrice(rcommon.USDC)
+
+	ronBalance.Total = totalValueInUsd
+	ronBalance.ContractTotal = contractValueInUsd
+
+	// Chi Gas Token
+	{
+		if balance := di.ronTokensBalance(rcommon.CHI); balance == nil {
+			log.Warn("RonFi GetAllBalance GetRonTokensBalance failed", "token", "CHI")
+		} else {
+			ronBalance.ContractChi = balance.Uint64()
+			log.Info("RonFi GetAllBalance", "Token", "Chi", "Balance", ronBalance.ContractChi)
+			if balance.Cmp(ChiLowBalanceWarningAmount) < 0 {
+				log.Warn("RonFi arb low balance", "Chi Balance", ronBalance.ContractChi)
+			}
+		}
+	}
 
 	return ronBalance
 }
