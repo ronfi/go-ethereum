@@ -11,7 +11,7 @@ const (
 	DexTxInQueueFilterMin = DexTxInQueueSkipMax / 16
 
 	maxWalletNonceKnownWallet = 128 // for each shard, the total is this multiply 256 (MapsetShardCount), i.e. maximum 32K SenderNonce reusing can be detected
-	maxStateDbsCopies         = 8
+	maxStateDbsCopies         = 32
 	ChanReadTimeout           = 1 * time.Second
 )
 

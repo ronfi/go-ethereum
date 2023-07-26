@@ -691,13 +691,15 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 		for _, arb := range arbs {
 			lpCycle := uniswap.FromAddress(w.di, tx, appState, v2AmountIOs, v3AmountIOs, v2Pools, v3Pools, arb[0].TokenIn, info, arb)
 			if lpCycle == nil {
-				log.Warn("RonFi huntingV3TxEvent: uniswap.FromAddress fail", "idx", i, "loopId", arb.String(), "tx", tx.Hash().String(), "pair", info.Address)
+				log.Warn("RonFi huntingTxEvent: uniswap.FromAddress fail", "idx", i, "loopId", arb.String(), "tx", tx.Hash().String(), "pair", info.Address)
 				continue
 			}
+
 			if !lpCycle.AutoUpdate(v3States) {
 				//log.Info("RonFi huntingV3TxEvent, lpCycle.AutoUpdate fail", "idx", idx, "loopId", arb.LoopId, "tx", tx.Hash().String(), "pair", pairInfo.Address)
 				continue
 			}
+
 			res := lpCycle.CalculateArbitrage()
 			if res != nil && res.Profitable {
 				profit := &uniswap.CycleWithProfit{
@@ -724,6 +726,16 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 					uniProfit:        profit,
 				}
 				profits = append(profits, &profitDetail)
+
+				log.Warn("RonFi huntingTxEvent, lpCycle.CalculateArbitrage --- succeed",
+					"tx", tx.Hash().String(),
+					"idx", i,
+					"input token", profit.Cycle.InputToken,
+					"loop", arb.String(),
+					"pair", info.Address,
+					"amountIn", res.SwapAmount,
+					"grossProfitInUsd", profitDetail.grossProfitInUsd,
+					"netProfitInUsd", profitDetail.netProfitInUsd)
 			}
 		}
 
@@ -732,7 +744,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 			highestProfit := profits[0]
 
 			if highestProfit.netProfitInUsd > w.minHuntingProfit {
-				log.Info("RonFi huntingV3TxEvent early hunting",
+				log.Info("RonFi huntingTxEvent early hunting",
 					"i", i, "loops", len(arbs),
 					"loop", highestProfit.loopName, "netProfitInUsd", highestProfit.netProfitInUsd)
 
@@ -744,7 +756,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 				for _, amountOut := range highestProfit.uniProfit.Profit.AmountOuts {
 					amountOuts = fmt.Sprintf("%s %s", amountOuts, amountOut.String())
 				}
-				log.Info("RonFi huntingV3TxEvent found profit",
+				log.Info("RonFi huntingTxEvent found profit",
 					"tx", tx.Hash().String(),
 					"inputToken", highestProfit.uniProfit.Cycle.InputToken,
 					"target pair", info.Address,
@@ -766,7 +778,6 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 
 				w.huntingTxPair(tx, i, handlerStartTime, w.currentBlockNum, info, highestProfit.uniProfit, highestProfit)
 			}
-
 		}
 	}
 }
