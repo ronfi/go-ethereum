@@ -477,6 +477,9 @@ func (h *handler) Start(maxPeers int) {
 	// start sync handlers
 	h.wg.Add(1)
 	go h.chainSync.loop()
+
+	// start common task pool
+	common.RonHuntingTaskPool(common.MaxRonHuntingTasks)
 }
 
 func (h *handler) Stop() {
