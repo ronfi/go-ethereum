@@ -1,10 +1,12 @@
 package defi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
@@ -21,6 +23,10 @@ type Protocol int
 
 const (
 	UniSwap Protocol = iota
+)
+
+var (
+	UniSwapStandardSwapMethod = crypto.Keccak256([]byte("swap(uint256,uint256,address,bytes)"))[:4]
 )
 
 func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
@@ -40,6 +46,7 @@ func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
 			record.Index,
 			0,
 			record.BothBriToken,
+			record.CanFlashLoan,
 			common.HexToAddress(record.KeyToken),
 			common.HexToAddress(record.Token0),
 			common.HexToAddress(record.Token1),
@@ -234,10 +241,26 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 		return
 	}
 
+	codeAddr := pair
+	if target, ok := di.proxy.detectProxyTarget(pair); ok {
+		codeAddr = target
+	}
+
+	bytecode, err := di.client.CodeAt(context.Background(), codeAddr, nil)
+	if err != nil || len(bytecode) <= 1 {
+		return
+	}
+
+	canFlashLoan := true
+	if !bytes.Contains(bytecode, UniSwapStandardSwapMethod) {
+		canFlashLoan = false
+	}
+
 	pairInfo = di.getUniSwapPairInfo(pair)
 	if pairInfo == nil {
 		log.Warn("RonFi Defi get pair info failed", "pair", pair)
 	}
+	pairInfo.CanFlashLoan = canFlashLoan
 
 	di.lock.Lock()
 	if pairInfo != nil {
@@ -296,6 +319,7 @@ func (di *Info) buildPairInfo(pair, factory, token0, token1 common.Address, name
 		index,
 		0,
 		bothBriToken,
+		true,
 		keyToken,
 		token0,
 		token1,

@@ -90,6 +90,6 @@ func TestInfo_CheckIfObs(t *testing.T) {
 		t.Fatal("TestInfo_CheckIfObs TransactionReceipt failed!", "err", err)
 	}
 
-	isDex, isObs := info.CheckIfObsTx(nil, tx, receipt.Logs, *tx.To())
+	isDex, isObs := info.CheckIfObsTx(tx, receipt.Logs, *tx.To())
 	t.Logf("isDex: %v, isObs: %v", isDex, isObs)
 }

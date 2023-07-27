@@ -24,10 +24,25 @@ func TestInfo_GetPairInfo(t *testing.T) {
 				Name:         "Uniswap V2",
 				Index:        0x8,
 				BothBriToken: false,
+				CanFlashLoan: true,
 				KeyToken:     common.HexToAddress("0xd87069e48Bec111639448E80f8D5A34e27129F47"),
 				Token0:       common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),
 				Token1:       common.HexToAddress("0xd87069e48Bec111639448E80f8D5A34e27129F47"),
 				Factory:      common.HexToAddress("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"),
+			},
+		},
+		{
+			pairType:    "PolkaBridge AMM",
+			pairAddress: common.HexToAddress("0xdda0A346D267a48EC74CC68979584d85501fe5D5"),
+			expected: PairInfo{
+				Name:         "PolkaBridge AMM",
+				Index:        0x9,
+				BothBriToken: true,
+				CanFlashLoan: false,
+				KeyToken:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
+				Token0:       common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),
+				Token1:       common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7"),
+				Factory:      common.HexToAddress("0xf5d8E98ef1f66f1cAb949A2555837FE755fc2D68"),
 			},
 		},
 	}
@@ -52,7 +67,7 @@ func TestInfo_GetPairInfo(t *testing.T) {
 	}
 	dbInst := db.NewMysql(conf)
 	if dbInst == nil {
-		t.Fatalf("TestInfo_CheckIfObs NewMysql failed!")
+		t.Fatalf("TestInfo_GetPairInfo NewMysql failed!")
 	}
 	info := NewInfo(client, dbInst)
 

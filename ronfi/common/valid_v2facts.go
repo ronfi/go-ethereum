@@ -26,7 +26,7 @@ var (
 		common.HexToAddress("0x6C565c5bbDc7F023Cae8a2495105A531caac6E54"): 70,
 		common.HexToAddress("0x8a93B6865C4492fF17252219B87eA6920848EdC0"): 30,
 		common.HexToAddress("0xa7028337D3DA1F04d638Cc3B4dD09411486b49EA"): 30,
-		common.HexToAddress("0xf5d8E98ef1f66f1cAb949A2555837FE755fc2D68"): 30,
+		common.HexToAddress("0xf5d8E98ef1f66f1cAb949A2555837FE755fc2D68"): 30, // unsupport flashloan
 		common.HexToAddress("0x460b2005b3318982feADA99f7ebF13e1D6f6eFfE"): 25,
 		common.HexToAddress("0xd87Ad19db2c4cCbf897106dE034D52e3DD90ea60"): 30,
 		common.HexToAddress("0x91fAe1bc94A9793708fbc66aDcb59087C46dEe10"): 30,

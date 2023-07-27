@@ -755,6 +755,7 @@ type PairInfoRecord struct {
 	Name         string
 	Index        uint64
 	BothBriToken bool
+	CanFlashLoan bool
 	KeyToken     string
 	Token0       string
 	Token1       string
@@ -791,7 +792,7 @@ func (sql *Mysql) LoadPairsInfo() []*PairInfoRecord {
 		endId := ids[end]
 
 		go func(beginId int, endId int) {
-			querySQL := fmt.Sprintf("select pair, name, pairIndex, bothBriToken, keyToken, token0, token1, factory from pairs where id between %d and %d;", beginId, endId)
+			querySQL := fmt.Sprintf("select pair, name, pairIndex, bothBriToken, canFlashLoan, keyToken, token0, token1, factory from pairs where id between %d and %d;", beginId, endId)
 			rows, err := sql.db.Query(querySQL)
 			if err != nil {
 				log.Warn("RonFi Mysql LoadPairsInfo query data failed", "querySQL", querySQL, "err", err)
@@ -808,13 +809,14 @@ func (sql *Mysql) LoadPairsInfo() []*PairInfoRecord {
 					name         string
 					index        int
 					bothBriToken bool
+					canFlashLoan bool
 					keyToken     string
 					token0       string
 					token1       string
 					factory      string
 				)
 
-				if err = rows.Scan(&pair, &name, &index, &bothBriToken, &keyToken, &token0, &token1, &factory); err == nil {
+				if err = rows.Scan(&pair, &name, &index, &bothBriToken, &canFlashLoan, &keyToken, &token0, &token1, &factory); err == nil {
 					if pair == "" {
 						continue
 					}
@@ -825,6 +827,7 @@ func (sql *Mysql) LoadPairsInfo() []*PairInfoRecord {
 							Name:         name,
 							Index:        uint64(index),
 							BothBriToken: bothBriToken,
+							CanFlashLoan: canFlashLoan,
 							KeyToken:     keyToken,
 							Token0:       token0,
 							Token1:       token1,
@@ -846,32 +849,39 @@ func (sql *Mysql) LoadPairsInfo() []*PairInfoRecord {
 }
 
 func (sql *Mysql) InsertPairsInfo(newPairsInfo []*PairInfoRecord) int64 {
-	updateSQL := fmt.Sprintf("insert ignore into pairs (pair, name, pairIndex, bothBriToken, keyToken, token0, token1, factory) values ")
+	updateSQL := fmt.Sprintf("insert ignore into pairs (pair, name, pairIndex, bothBriToken, canFlashLoan, keyToken, token0, token1, factory) values ")
 
 	length := len(newPairsInfo)
 	for index, info := range newPairsInfo {
 		bothBriToken := 0
+		canFlashLoan := 1
 		if info.BothBriToken {
 			bothBriToken = 1
 		}
+		if !info.CanFlashLoan {
+			canFlashLoan = 0
+		}
+
 		if index == length-1 {
-			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", %d, %d, \"%s\", \"%s\", \"%s\", \"%s\") ",
+			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", %d, %d, %d, \"%s\", \"%s\", \"%s\", \"%s\") ",
 				updateSQL,
 				info.Pair,
 				info.Name,
 				info.Index,
 				bothBriToken,
+				canFlashLoan,
 				info.KeyToken,
 				info.Token0,
 				info.Token1,
 				info.Factory)
 		} else {
-			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", %d, %d, \"%s\", \"%s\", \"%s\", \"%s\"), ",
+			updateSQL = fmt.Sprintf("%s (\"%s\", \"%s\", %d, %d, %d, \"%s\", \"%s\", \"%s\", \"%s\"), ",
 				updateSQL,
 				info.Pair,
 				info.Name,
 				info.Index,
 				bothBriToken,
+				canFlashLoan,
 				info.KeyToken,
 				info.Token0,
 				info.Token1,

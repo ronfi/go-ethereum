@@ -48,6 +48,7 @@ type PairInfo struct {
 	Index        uint64
 	Fee          uint64
 	BothBriToken bool
+	CanFlashLoan bool
 	KeyToken     common.Address
 	Token0       common.Address
 	Token1       common.Address
@@ -85,6 +86,7 @@ func (p PairInfo) Equals(s PairInfo) bool {
 	if p.Name != s.Name ||
 		p.Index != s.Index ||
 		p.BothBriToken != s.BothBriToken ||
+		p.CanFlashLoan != s.CanFlashLoan ||
 		p.KeyToken != s.KeyToken ||
 		p.Token0 != s.Token0 ||
 		p.Token1 != s.Token1 ||
