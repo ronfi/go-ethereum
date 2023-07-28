@@ -284,10 +284,10 @@ func (w *Worker) Init(executorPrivateKey string, pairGasMap map[string]uint64, v
 	log.Info("RonFi Init all executors", "total", len(w.executorAddress))
 	tmpMap = nil
 
-	//if !w.InitRonFiSwap() {
-	//	log.Error("RonFi InitRonFiSwap() failed")
-	//	return false
-	//}
+	if !w.InitRonFiSwap() {
+		log.Error("RonFi InitRonFiSwap() failed")
+		return false
+	}
 
 	balance := w.di.GetAllBalance(w.executorAddress, false)
 	log.Info("RonFi Init", "Initial Executor Eth", balance.Eth, "Initial Contract Balance in USD", balance.ContractTotal)

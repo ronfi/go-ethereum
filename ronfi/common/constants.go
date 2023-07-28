@@ -96,6 +96,8 @@ var (
 
 // public
 var (
+	RON_V3_SWAP_ADDRESS = common.HexToAddress("0x0C70A9dBC7e0704d344aa818FAE5cA6f0f73D534")
+
 	GasRough = [9]uint64{
 		0, 100000, 150000, 210000, 280000, 350000, 420000, 500000, 600000,
 	}
