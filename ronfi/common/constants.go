@@ -115,11 +115,11 @@ var (
 	CHI  = common.HexToAddress("0x0000000000004946c0e9F43F4Dee607b0eF1fA1c")
 
 	TradableTokens = map[common.Address]string{
-		USDT: "USDT",
-		USDC: "USDC",
+		//USDT: "USDT",
+		//USDC: "USDC",
 		WETH: "WETH",
-		BTCB: "BTCB",
-		DAI:  "DAI",
+		//BTCB: "BTCB",
+		//DAI:  "DAI",
 	}
 
 	BridgeTokens = map[common.Address]struct{}{
