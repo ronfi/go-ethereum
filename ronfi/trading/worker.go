@@ -788,16 +788,53 @@ func (w *Worker) huntingTxPair(tx *types.Transaction, pairId int, handlerStartTi
 		w.huntingPairs--
 	}()
 
-	//gasMaxLimit := bestProfit.Cycle.SumGasNeed
-	//profitMin := rcommon.ToWei(info.txFeeInToken, 18)
-	//
-	//randomExecutorId := bestProfit.Cycle.LoopId.Uint64() + tx.Hash().TailUint64()
-	//// run the ring to draw an executor
-	//ringId := randomExecutorId % w.totalExecutors
-	//var arbTx *types.Transaction
+	gasMaxLimit := bestProfit.Cycle.SumGasNeed
+	profitMin := rcommon.ToWei(info.txFeeInToken, 18)
+	randomExecutorId := bestProfit.Cycle.LoopId.Uint64() + tx.Hash().TailUint64()
+	// run the ring to draw an executor
+	ringId := randomExecutorId % w.totalExecutors
+	var arbTx *types.Transaction
 
-	// todo: using flashbot to send bundle txs
+	if ok, arb := w.DexSwapHunting(w.executorPrivKey[ringId], &w.executorAddress[ringId], tx, profitMin, gasMaxLimit, bestProfit, w.dryRun, handlerStartTime); !ok {
+		w.huntingSkipStat[SkipReasonDexSwapHuntingFail]++
+	} else {
+		arbTx = arb
+	}
 
+	totalArbTxs := atomic.AddUint64(&w.totalArbTxs, 1)
+	if arbTx != nil {
+		log.Info(
+			"RonFi handler",
+			"dexTx", tx.Hash(),
+			"arbTx", arbTx.Hash(),
+			"pair", swapPairInfo.Address,
+			"id", pairId,
+			"f", rcommon.Float2Str(info.txFeeInToken, 6),
+			"p", rcommon.Float2Str(info.profitInToken, 6),
+			"t", w.tokenSymbol(info.targetToken),
+			"#", totalArbTxs)
+		{
+			// log and compare the original dex tx amount and the arb tx amount
+			tag, amount, token := getTokenAmount(w.di, []*defi.SwapPairInfo{
+				swapPairInfo,
+			})
+			if amount != 0 {
+				log.Info("RonFi handler",
+					"dexTx", tx.Hash(),
+					"peer", prefix6HexUint(tx.PeerId),
+					"rank", tx.PeerRank,
+					"t", w.tokenSymbol(token),
+					tag, rcommon.Float2Str(amount, 6),
+					"block", blockNumber)
+			} else {
+				log.Info("RonFi handler",
+					"dexTx", tx.Hash(),
+					"peer", prefix6HexUint(tx.PeerId),
+					"rank", tx.PeerRank,
+					"block", blockNumber)
+			}
+		}
+	}
 }
 
 func (w *Worker) applyTransaction(tx *types.Transaction, txHash common.Hash, state *state.StateDB) (bool, bool, string) {
@@ -834,5 +871,13 @@ func (w *Worker) ReportSkipReason(tx *types.Transaction, skipReason HuntingSkipR
 		if w.skipReasonFile != nil {
 			_, _ = w.skipReasonFile.WriteString(reason)
 		}
+	}
+}
+
+func (w *Worker) tokenSymbol(token common.Address) string {
+	if info := w.di.GetTokenInfo(token); info != nil {
+		return info.Symbol
+	} else {
+		return "undefined"
 	}
 }
