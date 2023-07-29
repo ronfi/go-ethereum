@@ -10,6 +10,7 @@ import (
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	ronswapv3fe "github.com/ethereum/go-ethereum/ronfi/contracts/contract_ronswapv3fe"
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
+	"github.com/metachris/flashbotsrpc"
 	"math/big"
 	"runtime"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 
 var (
 	ronV3Swap *ronswapv3fe.Ronswapv3fe
+	flashRpc  *flashbotsrpc.BuilderBroadcastRPC
 )
 
 func (w *Worker) InitRonFiSwap() bool {
@@ -24,6 +26,12 @@ func (w *Worker) InitRonFiSwap() bool {
 
 	if ronV3Swap, err = ronswapv3fe.NewRonswapv3fe(rcommon.RON_V3_SWAP_ADDRESS, w.client); err != nil {
 		log.Error("RonFi InitRonFiSwap New transactor instance Failed on Ronswapv3fe contract", "err", err)
+		return false
+	}
+
+	// create flash rpc
+	if flashRpc = flashbotsrpc.NewBuilderBroadcastRPC(falshbotURLs); err != nil {
+		log.Error("RonFi InitRonFiSwap create flashbot rpc failed!", "err", err)
 		return false
 	}
 
@@ -113,7 +121,10 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 		"elapsed", mclock.Since(handlerStartTime).String())
 
 	if !dryRun {
-		// call flash bot here.
+		txs := make([]*types.Transaction, 0, 2)
+		txs = append(txs, tx)
+		txs = append(txs, arbTx)
+		Flashbot(flashRpc, w.currentBlockNum, txs)
 		return true, arbTx
 
 	} else {
