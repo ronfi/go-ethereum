@@ -98,12 +98,11 @@ func (di *Info) ronTokensBalance(token common.Address) *big.Int {
 	if di == nil {
 		return nil
 	} else {
-		// todo: query balance in contract
-		//if balance := di.tokenBalance(token, rcommon.RON_V3_SWAP_ADDRESS); balance == nil {
-		//	log.Error("RonFi GetRonTokensBalance on RonSwapV3 failed!")
-		//} else {
-		//	return balance
-		//}
+		if balance := di.tokenBalance(token, rcommon.RON_V3_SWAP_ADDRESS); balance == nil {
+			log.Error("RonFi GetRonFiTokensBalance on RonSwapV3 failed!")
+		} else {
+			return balance
+		}
 	}
 
 	return nil
