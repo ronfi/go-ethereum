@@ -457,6 +457,24 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 
 // handleCall processes method calls.
 func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
+	switch msg.Method {
+	case "filterDupTxs":
+		FilterDupTxs = !FilterDupTxs
+		log.Info("RonFi arb control", "FilterDupTxs", FilterDupTxs)
+		return msg.response("ok")
+	case "logPairUse":
+		LogPairUse = true
+		return msg.response("ok")
+	case "logPairGas":
+		LogPairGas = true
+		return msg.response("ok")
+	case "logSkipReason":
+		LogSkipReason = !LogSkipReason
+		log.Info("RonFi arb control", "LogSkipReason", LogSkipReason)
+		return msg.response("ok")
+	default:
+	}
+
 	if msg.isSubscribe() {
 		return h.handleSubscribe(cp, msg)
 	}
