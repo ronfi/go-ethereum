@@ -340,21 +340,19 @@ func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router c
 	}
 	methodID := uint64(binary.BigEndian.Uint32(data[:4]))
 
-	{
-		if txpool.ObsRouters != nil {
-			routerMethod := fmt.Sprintf("%s-0x%08x", *to, methodID)
-			if _, isObs = txpool.ObsRouters[routerMethod]; isObs {
-				return
-			}
-		}
-	}
-
 	if _, isDex = txpool.DexRouters[*to]; isDex {
 		return
 	} else if _, isDex = txpool.DexMethodsTypical[methodID]; isDex {
 		return
 	} else if _, isObs = txpool.ObsMethods[methodID]; isObs {
 		return
+	}
+
+	if txpool.ObsRouters != nil {
+		routerMethod := fmt.Sprintf("%s-0x%08x", *to, methodID)
+		if _, isObs = txpool.ObsRouters[routerMethod]; isObs {
+			return
+		}
 	}
 
 	swapPairsInfo := di.ExtractSwapPairInfo(tx, router, vLogs, RonFiExtractTypeStats)

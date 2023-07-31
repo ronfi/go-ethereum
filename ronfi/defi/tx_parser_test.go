@@ -80,12 +80,12 @@ func TestInfo_CheckIfObs(t *testing.T) {
 	}
 	info := NewInfo(client, dbInst)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xea867e83606a106b2fc943b6da1acc68823fe78bade7b23b39a438749713bfdc"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x5d098158f7e6cbedff76ae96923f7e1e9456a23f9012f3a5ba208b3fba90bcf2"))
 	if err != nil {
 		t.Fatal("TestInfo_CheckIfObs TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xea867e83606a106b2fc943b6da1acc68823fe78bade7b23b39a438749713bfdc"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x5d098158f7e6cbedff76ae96923f7e1e9456a23f9012f3a5ba208b3fba90bcf2"))
 	if err != nil {
 		t.Fatal("TestInfo_CheckIfObs TransactionReceipt failed!", "err", err)
 	}
