@@ -258,7 +258,7 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 
 	pairInfo = di.getUniSwapPairInfo(pair)
 	if pairInfo == nil {
-		log.Warn("RonFi Defi get pair info failed", "pair", pair)
+		//log.Warn("RonFi Defi get pair info failed", "pair", pair)
 		return
 	}
 	pairInfo.CanFlashLoan = canFlashLoan
