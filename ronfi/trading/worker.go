@@ -687,6 +687,12 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 		}
 
 		arbs := w.v3LoopsDb.FindLoops(edge)
+		if len(arbs) == 0 {
+			log.Info("RonFi huntingTxEvent no matched loops!", "idx", i, "tx", tx.Hash().String(), "pair", info.Address)
+			continue
+		} else {
+			log.Info("RonFi huntingTxEvent matched loops", "idx", i, "tx", tx.Hash().String(), "pair", info.Address, "loops", len(arbs))
+		}
 		profits := make(ProfitDetails, 0, len(arbs))
 		for _, arb := range arbs {
 			lpCycle := uniswap.FromAddress(w.di, tx, appState, v2AmountIOs, v3AmountIOs, v2Pools, v3Pools, arb[0].TokenIn, info, arb)
@@ -710,8 +716,11 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 				profitInToken := rcommon.EthBigInt2Float64(profit.Profit.BestProfit)
 				grossProfitInUsd := profitInToken / price * defi.GetTradingTokenPrice(rcommon.USDC)
 
-				txFeeInBnb := rcommon.EthBigInt2Float64(new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
-				txFeeInUsd := txFeeInBnb * defi.GetTradingTokenPrice(rcommon.USDC)
+				//txFeeInBnb := rcommon.EthBigInt2Float64(new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
+				//txFeeInUsd := txFeeInBnb * defi.GetTradingTokenPrice(rcommon.USDC)
+				//txFeeInToken := price * txFeeInBnb
+				txFeeInBnb := 0.0
+				txFeeInUsd := 0.0
 				txFeeInToken := price * txFeeInBnb
 				netProfitInUsd := grossProfitInUsd - txFeeInUsd
 				profitDetail := ProfitDetail{
@@ -735,6 +744,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 					"pair", info.Address,
 					"amountIn", res.SwapAmount,
 					"grossProfitInUsd", profitDetail.grossProfitInUsd,
+					"txFeeInUsd", profitDetail.txFeeInUsd,
 					"netProfitInUsd", profitDetail.netProfitInUsd)
 			}
 		}

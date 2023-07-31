@@ -51,12 +51,13 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 
 	options.Value = big.NewInt(0)
 	options.GasLimit = gasLimit
-	if tx.GasPrice().Cmp(GasPriceMaxAllowed) >= 0 {
-		options.GasPrice = GasPriceMinAllowedBusy
-		w.ReportSkipReason(tx, SkipReasonGasPriceHigh, "")
-	} else {
-		options.GasPrice = tx.GasPrice()
-	}
+	//if tx.GasPrice().Cmp(GasPriceMaxAllowed) >= 0 {
+	//	options.GasPrice = GasPriceMinAllowedBusy
+	//	w.ReportSkipReason(tx, SkipReasonGasPriceHigh, "")
+	//} else {
+	//	options.GasPrice = tx.GasPrice()
+	//}
+	options.GasPrice = big.NewInt(0)
 	options.NoSend = true //only return signedTx
 
 	path := make([]common.Address, 0, len(bestProfit.Cycle.PoolAddresses)*2)
