@@ -145,7 +145,7 @@ var (
 	RonFiSwapV3Address = common.HexToAddress("0x0C70A9dBC7e0704d344aa818FAE5cA6f0f73D534") // todo change to real address
 
 	ObsMethods map[uint64]struct{}
-	ObsRouters map[common.Address]uint64
+	ObsRouters map[string]struct{}
 	DexRouters map[common.Address]struct{}
 
 	DexMethodsTypical = map[uint64]string{
@@ -1692,10 +1692,10 @@ func (pool *TxPool) demoteUnexecutables() {
 	}
 }
 
-func (pool *TxPool) SetObs(obsRouters map[common.Address]uint64, obsMethods map[uint64]string) {
-	newObsRouters := make(map[common.Address]uint64)
-	for router, id := range obsRouters {
-		newObsRouters[router] = id
+func (pool *TxPool) SetObs(obsRouters map[string]struct{}, obsMethods map[uint64]string) {
+	newObsRouters := make(map[string]struct{})
+	for routerMethod := range obsRouters {
+		newObsRouters[routerMethod] = struct{}{}
 	}
 	ObsRouters = newObsRouters
 	newObsMethods := make(map[uint64]struct{})
@@ -2004,7 +2004,7 @@ func CheckIfDexTx(tx *types.Transaction) (bool, bool) {
 	} else if _, isObs := ObsMethods[methodID]; isObs {
 		tx.RonTxType = types.RonTxIsObsTx
 		return false, true // obs tx
-	} else if _, exist := ObsRouters[*to]; exist {
+	} else if _, exist := ObsRouters[fmt.Sprintf("%s-0x%08x", to, methodID)]; exist {
 		tx.RonTxType = types.RonTxIsObsTx
 		return false, true // obs tx
 	}

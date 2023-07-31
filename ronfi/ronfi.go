@@ -43,7 +43,7 @@ type RonArbiter struct {
 	v3LoopsDb         *uniswap.V3Loops
 	pairGasMap        map[string]uint64         // the gas required for a pair swap (key: pair+dir)
 	dexPairsMap       map[common.Address]uint64 // collection of all dex pairs
-	obsRouters        map[common.Address]uint64
+	obsRouters        map[string]struct{}
 	obsMethods        map[uint64]string
 
 	client *ethclient.Client
@@ -94,19 +94,18 @@ func (r *RonArbiter) ResetStats() {
 	}
 }
 
-func (r *RonArbiter) NewObsRouter(router string, methodId uint32) {
-	log.Info("RonFi NewObsRouter", "router", router, "methodID", methodId)
+func (r *RonArbiter) NewObsRouter(routerMethod string, methodId uint32) {
+	log.Info("RonFi NewObsRouter", "routerMethod", routerMethod)
 	if r.mysql != nil {
 		jsonObs := &rcommon.JsonNewObs{
-			Router:   router,
-			MethodID: methodId,
+			RouterMethod: routerMethod,
 		}
 		res := r.mysql.InsertObsRouter(jsonObs)
-		log.Info("RonFi NewObsRouter insert mysql done!", "router", router, "methodID", methodId, "res", res)
+		log.Info("RonFi NewObsRouter insert mysql done!", "routerMethod", routerMethod, "res", res)
 		if res > 0 && r.rdb != nil {
 			jsonData, _ := json.Marshal(jsonObs)
 			r.rdb.Publish(rcommon.RedisMsgNewObsRouter, jsonData)
-			log.Info("RonFi NewObsRouter publish redis done!", "router", router, "methodID", methodId)
+			log.Info("RonFi NewObsRouter publish redis done!", "routerMethod", routerMethod, methodId)
 		}
 	}
 }

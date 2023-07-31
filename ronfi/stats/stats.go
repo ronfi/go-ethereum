@@ -83,7 +83,7 @@ type Stats struct {
 	dexPairsVol     map[common.Address]float64
 	prevResetTime   time.Time
 	obsMethods      map[uint64]string
-	obsRouters      map[common.Address]uint64
+	obsRouters      map[string]struct{}
 }
 
 type miscStatCnt struct {
@@ -101,7 +101,7 @@ func NewStats(
 	mysql *db.Mysql,
 	pairGasMap map[string]uint64,
 	dexPairsMap map[common.Address]uint64,
-	obsRouters map[common.Address]uint64,
+	obsRouters map[string]struct{},
 	obsMethods map[uint64]string,
 ) *Stats {
 	s := &Stats{
@@ -354,11 +354,11 @@ func (s *Stats) dexPairGasUsed(txs types.Transactions, receipts types.Receipts, 
 				if _, exist := txpool.ObsMethods[methodID]; !exist {
 					// only if the methodId is not in the core.ObsMethods list, collect the obs routers info
 					if s.obsRouters != nil && to != nil {
-						if _, exist := s.obsRouters[*to]; !exist {
-							s.obsRouters[*to] = methodID
+						routerMethod := fmt.Sprintf("%s-0x%08x", *to, methodID)
+						if _, exist := s.obsRouters[routerMethod]; !exist {
+							s.obsRouters[routerMethod] = struct{}{}
 							s.obsCol.notifyObs(&rcommon.NewObs{
-								Router:   *to,
-								MethodID: uint32(methodID),
+								RouterMethod: routerMethod,
 							})
 							log.Info("RonFi new obs found", "tx", tx.Hash().String(), "obs", tx.To(), "methodId", fmt.Sprintf("0x%08x", methodID))
 						}

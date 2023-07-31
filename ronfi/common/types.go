@@ -165,26 +165,22 @@ func (p *RawKnowledge) ToKey() string {
 }
 
 type JsonNewObs struct {
-	Router   string `json:"router"`
-	MethodID uint32 `json:"methodId"`
+	RouterMethod string `json:"router"`
 }
 
 func (record *JsonNewObs) ToNewObs() *NewObs {
 	return &NewObs{
-		Router:   common.HexToAddress(record.Router),
-		MethodID: record.MethodID,
+		RouterMethod: record.RouterMethod,
 	}
 }
 
 type NewObs struct {
-	Router   common.Address
-	MethodID uint32
+	RouterMethod string
 }
 
 func (newObs *NewObs) ToJsonNewObs() *JsonNewObs {
 	return &JsonNewObs{
-		Router:   newObs.Router.String(),
-		MethodID: newObs.MethodID,
+		RouterMethod: newObs.RouterMethod,
 	}
 }
 
@@ -192,14 +188,14 @@ type JsonNewDex struct {
 	Router string `json:"router"`
 }
 
-func (record *JsonNewDex) ToNewDex() *NewObs {
-	return &NewObs{
-		Router: common.HexToAddress(record.Router),
-	}
-}
-
 type NewDex struct {
 	Router common.Address
+}
+
+func (record *JsonNewDex) ToNewDex() *NewDex {
+	return &NewDex{
+		Router: common.HexToAddress(record.Router),
+	}
 }
 
 func (newDex *NewDex) ToJsonNewDex() *JsonNewDex {

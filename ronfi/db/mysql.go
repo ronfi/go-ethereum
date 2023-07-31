@@ -397,8 +397,8 @@ func (sql *Mysql) UpdateDexPairs(dexPairs map[common.Address]uint64) int64 {
 	return -1
 }
 
-func (sql *Mysql) LoadObsRouters() map[common.Address]uint64 {
-	querySQL := fmt.Sprintf("select router, methodID from obs_routers;")
+func (sql *Mysql) LoadObsRouters() map[string]struct{} {
+	querySQL := fmt.Sprintf("select routerMethod from obs_routers;")
 	rows, err := sql.db.Query(querySQL)
 	if err != nil {
 		log.Warn("RonFi Mysql LoadObsRouters query data failed", "querySQL", querySQL, "err", err)
@@ -408,32 +408,31 @@ func (sql *Mysql) LoadObsRouters() map[common.Address]uint64 {
 		_ = rows.Close()
 	}()
 
-	obsRoutersMap := make(map[common.Address]uint64)
+	obsRoutersMap := make(map[string]struct{})
 	for rows.Next() {
 		var (
-			router   string
-			methodID uint64
+			routerMethod string
 		)
 
-		if err = rows.Scan(&router, &methodID); err == nil {
-			obsRoutersMap[common.HexToAddress(router)] = methodID
+		if err = rows.Scan(&routerMethod); err == nil {
+			obsRoutersMap[routerMethod] = struct{}{}
 		}
 	}
 
 	return obsRoutersMap
 }
 
-func (sql *Mysql) UpdateObsRouters(obsRouters map[common.Address]uint64) int64 {
+func (sql *Mysql) UpdateObsRouters(obsRouters map[string]struct{}) int64 {
 	startTime := mclock.Now()
 
-	updateSQL := fmt.Sprintf("insert into obs_routers (router, methodID) values ")
+	updateSQL := fmt.Sprintf("insert into obs_routers (routerMethod) values ")
 	index := 0
 	length := len(obsRouters)
-	for router, methodID := range obsRouters {
+	for routerMethod := range obsRouters {
 		if index == length-1 {
-			updateSQL = fmt.Sprintf("%s (\"%s\", %d) ", updateSQL, router.String(), methodID)
+			updateSQL = fmt.Sprintf("%s (\"%s\") ", updateSQL, routerMethod)
 		} else {
-			updateSQL = fmt.Sprintf("%s (\"%s\", %d), ", updateSQL, router.String(), methodID)
+			updateSQL = fmt.Sprintf("%s (\"%s\"), ", updateSQL, routerMethod)
 		}
 		index++
 	}
@@ -452,8 +451,8 @@ func (sql *Mysql) UpdateObsRouters(obsRouters map[common.Address]uint64) int64 {
 }
 
 func (sql *Mysql) InsertObsRouter(record *rcommon.JsonNewObs) int64 {
-	updateSQL := fmt.Sprintf("insert ignore into obs_routers (router, methodID) values (\"%s\", %d);",
-		record.Router, record.MethodID)
+	updateSQL := fmt.Sprintf("insert ignore into obs_routers (routerMethod) values (\"%s\");",
+		record.RouterMethod)
 	rows, err := sql.db.Exec(updateSQL)
 	if err == nil {
 		if lastId, err := rows.LastInsertId(); err == nil {
