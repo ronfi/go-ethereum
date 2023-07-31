@@ -562,3 +562,9 @@ func (s *Ethereum) StopStats() {
 	log.Info("RonFi stats stop")
 	s.ronArbiter.StopStats()
 }
+
+// ReloadLoops Stop RonFi Stats Service
+func (s *Ethereum) ReloadLoops() {
+	log.Info("RonFi reload loops")
+	s.ronArbiter.ReloadLoops()
+}

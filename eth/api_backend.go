@@ -424,3 +424,7 @@ func (b *EthAPIBackend) StartArbing(dryRun bool, minHuntingProfit int) {
 func (b *EthAPIBackend) StopArbing() {
 	b.eth.StopArbing()
 }
+
+func (b *EthAPIBackend) ReloadLoops() {
+	b.eth.ReloadLoops()
+}

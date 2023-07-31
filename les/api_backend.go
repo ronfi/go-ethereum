@@ -348,3 +348,6 @@ func (b *LesApiBackend) StartArbing(dryRun bool, minHuntingProfit int) {
 
 func (b *LesApiBackend) StopArbing() {
 }
+
+func (b *LesApiBackend) ReloadLoops() {
+}
