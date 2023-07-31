@@ -195,7 +195,7 @@ func NewV3Loops(
 	for addr, info := range pairsInfo {
 		if isStaledPools(di, addr, info.Token0, info.Token1) {
 			totalStaledV2Pairs++
-			//log.Info("RonFi V3Loops", "skip staled pair", addr)
+			log.Info("RonFi V3Loops", "skip staled pair", addr)
 			continue
 		}
 
@@ -235,7 +235,7 @@ func NewV3Loops(
 	for addr, info := range poolsInfo {
 		if isStaledPools(di, addr, info.Token0, info.Token1) {
 			totalStaledV3Pools++
-			//log.Info("RonFi V3Loops", "skip staled pool", addr)
+			log.Info("RonFi V3Loops", "skip staled pool", addr)
 			continue
 		}
 
@@ -357,7 +357,7 @@ func isStaledPools(di *defi.Info, addr, token0, token1 common.Address) bool {
 	isBriPool := false
 	_, ok0 := rcommon.BridgeTokens[token0]
 	_, ok1 := rcommon.BridgeTokens[token1]
-	if ok0 || ok1 {
+	if ok0 && ok1 {
 		isBriPool = true
 	}
 

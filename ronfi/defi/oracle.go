@@ -118,6 +118,8 @@ func GetTokenPrice(token common.Address) float64 {
 	case rcommon.USDC:
 		fallthrough
 	case rcommon.USDT:
+		fallthrough
+	case rcommon.BUSD:
 		price = 1.0
 	}
 

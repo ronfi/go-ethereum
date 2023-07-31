@@ -111,6 +111,7 @@ var (
 	DAI  = common.HexToAddress("0x6B175474E89094C44Da98b954EedeAC495271d0F")
 	USDC = common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	USDT = common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
+	BUSD = common.HexToAddress("0x4Fabb145d64652a948d72533023f6E7A623C7C53")
 	BTCB = common.HexToAddress("0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c")
 	CHI  = common.HexToAddress("0x0000000000004946c0e9F43F4Dee607b0eF1fA1c")
 
@@ -126,6 +127,7 @@ var (
 		DAI:  {},
 		USDC: {},
 		USDT: {},
+		BUSD: {},
 		WETH: {},
 		BTCB: {},
 	}
