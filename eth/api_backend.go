@@ -428,3 +428,19 @@ func (b *EthAPIBackend) StopArbing() {
 func (b *EthAPIBackend) ReloadLoops() {
 	b.eth.ReloadLoops()
 }
+
+func (b *EthAPIBackend) ResetStats() {
+	b.eth.ResetStats()
+}
+
+func (b *EthAPIBackend) NewDexRouter(router string) {
+	b.eth.NewDexRouter(router)
+}
+
+func (b *EthAPIBackend) NewObsRouter(routerMethod string) {
+	b.eth.NewObsRouter(routerMethod)
+}
+
+func (b *EthAPIBackend) DelDexRouter(router string) {
+	b.eth.DelDexRouter(router)
+}

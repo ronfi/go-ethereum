@@ -568,3 +568,19 @@ func (s *Ethereum) ReloadLoops() {
 	log.Info("RonFi reload loops")
 	s.ronArbiter.ReloadLoops()
 }
+
+func (s *Ethereum) ResetStats() {
+	s.ronArbiter.ResetStats()
+}
+
+func (s *Ethereum) NewDexRouter(router string) {
+	s.ronArbiter.NewDexRouter(router)
+}
+
+func (s *Ethereum) NewObsRouter(routerMethod string) {
+	s.ronArbiter.NewObsRouter(routerMethod)
+}
+
+func (s *Ethereum) DelDexRouter(router string) {
+	s.ronArbiter.DelDexRouter(router)
+}

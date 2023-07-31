@@ -43,6 +43,7 @@ type RonArbiter struct {
 	v3LoopsDb         *uniswap.V3Loops
 	pairGasMap        map[string]uint64         // the gas required for a pair swap (key: pair+dir)
 	dexPairsMap       map[common.Address]uint64 // collection of all dex pairs
+	dexRouters        map[common.Address]struct{}
 	obsRouters        map[string]struct{}
 	obsMethods        map[uint64]string
 
@@ -94,7 +95,7 @@ func (r *RonArbiter) ResetStats() {
 	}
 }
 
-func (r *RonArbiter) NewObsRouter(routerMethod string, methodId uint32) {
+func (r *RonArbiter) NewObsRouter(routerMethod string) {
 	log.Info("RonFi NewObsRouter", "routerMethod", routerMethod)
 	if r.mysql != nil {
 		jsonObs := &rcommon.JsonNewObs{
@@ -105,7 +106,39 @@ func (r *RonArbiter) NewObsRouter(routerMethod string, methodId uint32) {
 		if res > 0 && r.rdb != nil {
 			jsonData, _ := json.Marshal(jsonObs)
 			r.rdb.Publish(rcommon.RedisMsgNewObsRouter, jsonData)
-			log.Info("RonFi NewObsRouter publish redis done!", "routerMethod", routerMethod, methodId)
+			log.Info("RonFi NewObsRouter publish redis done!", "routerMethod", routerMethod)
+		}
+	}
+}
+
+func (r *RonArbiter) NewDexRouter(router string) {
+	log.Info("RonFi NewDexRouter", "router", router)
+	if r.mysql != nil {
+		jsonDex := &rcommon.JsonNewDex{
+			Router: router,
+		}
+		res := r.mysql.InsertDexRouter(jsonDex)
+		log.Info("RonFi NewDexRouter insert mysql done!", "router", router, "res", res)
+		if res > 0 && r.rdb != nil {
+			jsonData, _ := json.Marshal(jsonDex)
+			r.rdb.Publish(rcommon.RedisMsgNewDexRouter, jsonData)
+			log.Info("RonFi NewDexRouter publish redis done!", "router", router)
+		}
+	}
+}
+
+func (r *RonArbiter) DelDexRouter(router string) {
+	log.Info("RonFi DelDexRouter", "router", router)
+	if r.mysql != nil {
+		jsonDex := &rcommon.JsonNewDex{
+			Router: router,
+		}
+		res := r.mysql.DelDexRouter(jsonDex)
+		log.Info("RonFi DelDexRouter delete mysql done!", "router", router, "res", res)
+		if res >= 0 && r.rdb != nil {
+			jsonData, _ := json.Marshal(jsonDex)
+			r.rdb.Publish(rcommon.RedisMsgDelDexRouter, jsonData)
+			log.Info("RonFi DelDexRouter publish redis done!", "router", router)
 		}
 	}
 }
@@ -118,6 +151,8 @@ func (r *RonArbiter) ReloadLoops() {
 		r.dexPairsMap = r.mysql.LoadDexPairs()
 		r.obsRouters = r.mysql.LoadObsRouters()
 		r.obsMethods = r.mysql.LoadObsMethods()
+		r.dexRouters = r.mysql.LoadDexRouters()
+		r.eth.TxPool().SetDex(r.dexRouters)
 		r.eth.TxPool().SetObs(r.obsRouters, r.obsMethods)
 
 		pairsInfo := make(defi.PairInfoMap)

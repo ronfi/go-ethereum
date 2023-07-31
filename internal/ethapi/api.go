@@ -881,6 +881,22 @@ func (s *BlockChainAPI) ReloadLoops() {
 	s.b.ReloadLoops()
 }
 
+func (s *BlockChainAPI) ResetStats() {
+	s.b.ResetStats()
+}
+
+func (s *BlockChainAPI) NewDexRouter(router string) {
+	s.b.NewDexRouter(router)
+}
+
+func (s *BlockChainAPI) NewObsRouter(routerMethod string) {
+	s.b.NewObsRouter(routerMethod)
+}
+
+func (s *BlockChainAPI) DelDexRouter(router string) {
+	s.b.DelDexRouter(router)
+}
+
 // OverrideAccount indicates the overriding fields of account during the execution
 // of a message call.
 // Note, state and stateDiff can't be specified at the same time. If state is

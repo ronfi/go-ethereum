@@ -464,6 +464,59 @@ func (sql *Mysql) InsertObsRouter(record *rcommon.JsonNewObs) int64 {
 	return -1
 }
 
+func (sql *Mysql) LoadDexRouters() map[common.Address]struct{} {
+	querySQL := fmt.Sprintf("select router from dex_routers;")
+	rows, err := sql.db.Query(querySQL)
+	if err != nil {
+		log.Warn("RonFi Mysql LoadDexRouters query data failed", "querySQL", querySQL, "err", err)
+		return nil
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	dexRoutersMap := make(map[common.Address]struct{})
+	for rows.Next() {
+		var (
+			router string
+		)
+
+		if err = rows.Scan(&router); err == nil {
+			dexRoutersMap[common.HexToAddress(router)] = struct{}{}
+		}
+	}
+
+	return dexRoutersMap
+}
+
+func (sql *Mysql) InsertDexRouter(record *rcommon.JsonNewDex) int64 {
+	updateSQL := fmt.Sprintf("insert ignore into dex_routers (router) values (\"%s\");",
+		record.Router)
+	rows, err := sql.db.Exec(updateSQL)
+	if err == nil {
+		if lastId, err := rows.LastInsertId(); err == nil {
+			return lastId
+		}
+	}
+
+	log.Warn("RonFi Mysql InsertDexRouter failed", "err", err)
+	return -1
+}
+
+func (sql *Mysql) DelDexRouter(record *rcommon.JsonNewDex) int64 {
+	updateSQL := fmt.Sprintf("delete from dex_routers where router=\"%s\";",
+		record.Router)
+	rows, err := sql.db.Exec(updateSQL)
+	if err == nil {
+		if lastId, err := rows.LastInsertId(); err == nil {
+			return lastId
+		}
+	}
+
+	log.Warn("RonFi Mysql DelDexRouter failed", "err", err)
+	return -1
+}
+
 func (sql *Mysql) LoadObsMethods() map[uint64]string {
 	querySQL := fmt.Sprintf("select methodID, obsInfo from obs_methods;")
 	rows, err := sql.db.Query(querySQL)
