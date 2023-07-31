@@ -349,7 +349,9 @@ func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router c
 		}
 	}
 
-	if _, isDex = txpool.DexMethodsTypical[methodID]; isDex {
+	if _, isDex = txpool.DexRouters[*to]; isDex {
+		return
+	} else if _, isDex = txpool.DexMethodsTypical[methodID]; isDex {
 		return
 	} else if _, isObs = txpool.ObsMethods[methodID]; isObs {
 		return
