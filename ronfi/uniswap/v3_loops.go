@@ -189,10 +189,13 @@ func NewV3Loops(
 	pairGasMap map[string]uint64,
 ) *V3Loops {
 
+	totalStaledV2Pairs := 0
+	totalStaledV3Pools := 0
 	g := NewGraph()
 	for addr, info := range pairsInfo {
-		if isStaledPools(di, addr, info) {
-			log.Info("RonFi V3Loops", "skip staled pair", addr)
+		if isStaledPools(di, addr, info.Token0, info.Token1) {
+			totalStaledV2Pairs++
+			//log.Info("RonFi V3Loops", "skip staled pair", addr)
 			continue
 		}
 
@@ -230,6 +233,12 @@ func NewV3Loops(
 	}
 
 	for addr, info := range poolsInfo {
+		if isStaledPools(di, addr, info.Token0, info.Token1) {
+			totalStaledV3Pools++
+			//log.Info("RonFi V3Loops", "skip staled pool", addr)
+			continue
+		}
+
 		key := fmt.Sprintf("%s-%d", addr, 0)
 		gasNeed, ok := pairGasMap[key]
 		if !ok {
@@ -259,6 +268,7 @@ func NewV3Loops(
 			GasNeed:  gasNeed,
 		}})
 	}
+	log.Info("RonFi V3Loops", "total staled v2 pairs", totalStaledV2Pairs, "total staled v3 pools", totalStaledV3Pools)
 
 	return &V3Loops{
 		di:         di,
@@ -343,16 +353,16 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	return arbs
 }
 
-func isStaledPools(di *defi.Info, addr common.Address, info *defi.PairInfo) bool {
+func isStaledPools(di *defi.Info, addr, token0, token1 common.Address) bool {
 	isBriPool := false
-	_, ok0 := rcommon.BridgeTokens[info.Token0]
-	_, ok1 := rcommon.BridgeTokens[info.Token1]
+	_, ok0 := rcommon.BridgeTokens[token0]
+	_, ok1 := rcommon.BridgeTokens[token1]
 	if ok0 || ok1 {
 		isBriPool = true
 	}
 
-	token0Bal := di.GetTokenBalance(addr, info.Token0)
-	token0Info := di.GetTokenInfo(info.Token0)
+	token0Bal := di.GetTokenBalance(addr, token0)
+	token0Info := di.GetTokenInfo(token0)
 	if token0Info == nil {
 		return true
 	}
@@ -360,7 +370,7 @@ func isStaledPools(di *defi.Info, addr common.Address, info *defi.PairInfo) bool
 	// if bridge pool and total vol < 10000 usd, ignore it
 	if isBriPool {
 		value0 := rcommon.ToFloat(token0Bal, token0Info.Decimals) *
-			defi.GetTokenPrice(info.Token0)
+			defi.GetTokenPrice(token0)
 		if value0 < 5000.0 {
 			return true
 		} else {
@@ -372,8 +382,8 @@ func isStaledPools(di *defi.Info, addr common.Address, info *defi.PairInfo) bool
 			return true
 		}
 
-		token1Bal := di.GetTokenBalance(addr, info.Token1)
-		token1Info := di.GetTokenInfo(info.Token1)
+		token1Bal := di.GetTokenBalance(addr, token1)
+		token1Info := di.GetTokenInfo(token1)
 		if token1Info == nil {
 			return true
 		}
