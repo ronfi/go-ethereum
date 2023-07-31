@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
+	"math/big"
 	"sync"
 )
 
@@ -190,8 +191,8 @@ func NewV3Loops(
 
 	g := NewGraph()
 	for addr, info := range pairsInfo {
-		if isStaledBridgePair(di, addr, info) {
-			log.Info("RonFi V3Loops", "skip staled bridge pair", addr)
+		if isStaledPools(di, addr, info) {
+			log.Info("RonFi V3Loops", "skip staled pair", addr)
 			continue
 		}
 
@@ -275,18 +276,18 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	dedicatedEdges := []*Edge{edge}
 
 	cycles := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 2)
-	if len(cycles) < 0 {
-		cycles3 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 3)
-		if len(cycles3) < 0 {
-			cycles4 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 4)
-			cycles = append(cycles, cycles4...)
-		} else {
-			cycles = append(cycles, cycles3...)
-		}
-		if len(cycles) > 24 {
-			cycles = cycles[:24]
-		}
+	//if len(cycles) < 0 {
+	cycles3 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 3)
+	if len(cycles3) < 0 {
+		cycles4 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 4)
+		cycles = append(cycles, cycles4...)
+	} else {
+		cycles = append(cycles, cycles3...)
 	}
+	if len(cycles) > 24 {
+		cycles = cycles[:24]
+	}
+	//}
 
 	for _, cycle := range cycles {
 		validCycle := true
@@ -342,29 +343,47 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	return arbs
 }
 
-func isStaledBridgePair(di *defi.Info, addr common.Address, info *defi.PairInfo) bool {
+func isStaledPools(di *defi.Info, addr common.Address, info *defi.PairInfo) bool {
+	isBriPool := false
 	_, ok0 := rcommon.BridgeTokens[info.Token0]
 	_, ok1 := rcommon.BridgeTokens[info.Token1]
-	if !ok0 || !ok1 {
-		return false
+	if ok0 || ok1 {
+		isBriPool = true
 	}
 
-	res := di.GetPairReserves(addr)
-	if res == nil {
-		return false
-	}
+	token0Bal := di.GetTokenBalance(addr, info.Token0)
 	token0Info := di.GetTokenInfo(info.Token0)
 	if token0Info == nil {
-		return false
-	}
-
-	value0 := rcommon.ToFloat(res.Reserve0, token0Info.Decimals) *
-		defi.GetTokenPrice(info.Token0)
-	if value0 < 5000.0 {
 		return true
 	}
 
-	return false
+	// if bridge pool and total vol < 10000 usd, ignore it
+	if isBriPool {
+		value0 := rcommon.ToFloat(token0Bal, token0Info.Decimals) *
+			defi.GetTokenPrice(info.Token0)
+		if value0 < 5000.0 {
+			return true
+		} else {
+			return false
+		}
+	} else {
+		threshold := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(token0Info.Decimals-5)), nil)
+		if token0Bal == nil || token0Bal.Cmp(threshold) < 0 {
+			return true
+		}
+
+		token1Bal := di.GetTokenBalance(addr, info.Token1)
+		token1Info := di.GetTokenInfo(info.Token1)
+		if token1Info == nil {
+			return true
+		}
+		threshold = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(token1Info.Decimals-5)), nil)
+		if token1Bal == nil || token1Bal.Cmp(threshold) == 0 {
+			return true
+		}
+
+		return false
+	}
 }
 
 func ToV3Edge(pairInfo *defi.SwapPairInfo) *Edge {
