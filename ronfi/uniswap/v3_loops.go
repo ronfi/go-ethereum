@@ -195,7 +195,7 @@ func NewV3Loops(
 	for addr, info := range pairsInfo {
 		if isStaledPools(di, addr, info.Token0, info.Token1) {
 			totalStaledV2Pairs++
-			log.Info("RonFi V3Loops", "skip staled pair", addr)
+			//log.Info("RonFi V3Loops", "skip staled pair", addr)
 			continue
 		}
 
@@ -235,7 +235,7 @@ func NewV3Loops(
 	for addr, info := range poolsInfo {
 		if isStaledPools(di, addr, info.Token0, info.Token1) {
 			totalStaledV3Pools++
-			log.Info("RonFi V3Loops", "skip staled pool", addr)
+			//log.Info("RonFi V3Loops", "skip staled pool", addr)
 			continue
 		}
 
