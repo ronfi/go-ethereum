@@ -635,16 +635,31 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 	if len(swapPairsInfo) > 1 {
 		for i := 0; i < len(swapPairsInfo); i++ {
 			for j := i + 1; j < len(swapPairsInfo); j++ {
-				pairs := swapPairsInfo[i : j+1]
+				pairs := make([]*SwapPairInfo, 0, j+1-i)
+				for k := i; k <= j; k++ {
+					pairs = append(pairs, swapPairsInfo[k])
+				}
 				if len(pairs) > 1 {
 					var k int
 
 					// check head in == tail out
 					head := pairs[0]
 					tail := pairs[len(pairs)-1]
-					_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
-					if !tradableToken || head.TokenIn != tail.TokenOut {
+					if head.TokenIn != tail.TokenOut {
 						continue
+					}
+
+					// for v3 flash swap, the logs of swap event is not in order
+					_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
+					if !tradableToken {
+						_, tradableToken = rcommon.OBSTradableTokens[head.TokenOut]
+						if !tradableToken {
+							continue
+						} else {
+							pairs[0], pairs[len(pairs)-1] = pairs[len(pairs)-1], pairs[0]
+							head = pairs[0]
+							tail = pairs[len(pairs)-1]
+						}
 					}
 
 					// check linkage
@@ -659,8 +674,6 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 
 					// linkage ok, check profit
 					if k == len(pairs)-1 {
-						i = j + 1
-
 						// check amounts in/out
 						checkAmounts := true
 						for h := 0; h < k; h++ {

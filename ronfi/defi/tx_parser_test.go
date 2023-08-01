@@ -36,12 +36,12 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 	}
 	info := NewInfo(client, dbInst)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x1a9c2ea9c0d981e5706b373db6245e0c5e55aa4fcdf226d01b7294e99baf84c3"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0xb8aca7e1322f4e540f982039bcbf8ba861fcff3e23c550448a03bb73dc87296a"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x1a9c2ea9c0d981e5706b373db6245e0c5e55aa4fcdf226d01b7294e99baf84c3"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0xb8aca7e1322f4e540f982039bcbf8ba861fcff3e23c550448a03bb73dc87296a"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}

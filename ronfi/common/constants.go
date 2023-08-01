@@ -112,6 +112,7 @@ var (
 	USDC = common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	USDT = common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
 	BUSD = common.HexToAddress("0x4Fabb145d64652a948d72533023f6E7A623C7C53")
+	USDP = common.HexToAddress("0x8E870D67F660D95d5be530380D0eC0bd388289E1")
 	BTCB = common.HexToAddress("0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c")
 	CHI  = common.HexToAddress("0x0000000000004946c0e9F43F4Dee607b0eF1fA1c")
 
@@ -127,6 +128,7 @@ var (
 		WETH: "WETH",
 		USDT: "USDT",
 		USDC: "USDC",
+		USDP: "USDP",
 	}
 
 	BridgeTokens = map[common.Address]struct{}{
