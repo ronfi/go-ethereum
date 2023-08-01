@@ -642,7 +642,8 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 					// check head in == tail out
 					head := pairs[0]
 					tail := pairs[len(pairs)-1]
-					if head.TokenIn != tail.TokenOut {
+					_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
+					if !tradableToken || head.TokenIn != tail.TokenOut {
 						continue
 					}
 
@@ -659,7 +660,21 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 					// linkage ok, check profit
 					if k == len(pairs)-1 {
 						i = j + 1
-						totalProfit += di.loopProfit(pairs)
+
+						// check amounts in/out
+						checkAmounts := true
+						for h := 0; h < k; h++ {
+							prev := pairs[h]
+							next := pairs[h+1]
+							if prev.AmountOut == nil || next.AmountIn == nil || prev.AmountOut.Cmp(next.AmountIn) != 0 {
+								checkAmounts = false
+								break
+							}
+						}
+
+						if checkAmounts {
+							totalProfit += di.loopProfit(pairs)
+						}
 					}
 				}
 			}

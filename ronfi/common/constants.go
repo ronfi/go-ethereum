@@ -123,6 +123,12 @@ var (
 		//DAI:  "DAI",
 	}
 
+	OBSTradableTokens = map[common.Address]string{
+		WETH: "WETH",
+		USDT: "USDT",
+		USDC: "USDC",
+	}
+
 	BridgeTokens = map[common.Address]struct{}{
 		DAI:  {},
 		USDC: {},
