@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
@@ -24,7 +25,7 @@ var (
 func (w *Worker) InitRonFiSwap() bool {
 	var err error
 
-	if ronV3Swap, err = ronswapv3fe.NewRonswapv3fe(rcommon.RON_V3_SWAP_ADDRESS, w.client); err != nil {
+	if ronV3Swap, err = ronswapv3fe.NewRonswapv3fe(txpool.RonFiSwapV3Address, w.client); err != nil {
 		log.Error("RonFi InitRonFiSwap New transactor instance Failed on Ronswapv3fe contract", "err", err)
 		return false
 	}

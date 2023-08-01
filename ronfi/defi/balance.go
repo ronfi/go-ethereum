@@ -3,6 +3,7 @@ package defi
 import (
 	"context"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
@@ -98,7 +99,7 @@ func (di *Info) ronTokensBalance(token common.Address) *big.Int {
 	if di == nil {
 		return nil
 	} else {
-		if balance := di.tokenBalance(token, rcommon.RON_V3_SWAP_ADDRESS); balance == nil {
+		if balance := di.tokenBalance(token, txpool.RonFiSwapV3Address); balance == nil {
 			log.Error("RonFi GetRonFiTokensBalance on RonSwapV3 failed!")
 		} else {
 			return balance
