@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
+	algebrapool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_algebrapool"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
 	"math/big"
 	"strings"
@@ -38,12 +39,12 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 	for _, vlog := range vLogs {
 		var (
 			amountIn, amountOut, reserve0, reserve1 *big.Int
-			tokenIn, tokenOut, sender, to           common.Address
+			tokenIn, tokenOut, sender, to, keyToken common.Address
 			info                                    *PairInfo
 			poolInfo                                *PoolInfo
 			key                                     string
 			dir                                     uint64
-			hasSwapPairInfo                         bool
+			hasSwapPairInfo, bothBriToken           bool
 		)
 
 		if len(vlog.Topics) > 0 {
@@ -55,12 +56,20 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 				if len(data) >= 32 && len(vlog.Topics) == 3 {
 					log.Info("RonFi extractSwapPairInfo pair created", "dexTx", tx.Hash().String(), "pair", address)
 				}
-			case state.V2SyncEvent:
+			case state.V2SyncEvent, state.V2Sync2Event:
 				if len(data) == 64 && eType == RonFiExtractTypeHunting {
 					syncPairInfo = &V2SyncInfo{
 						address,
 						new(big.Int).SetBytes(data[18:32]), // 112 bits = 14 bytes, 32-14=18
 						new(big.Int).SetBytes(data[50:64]), // 64-14=50
+					}
+				}
+			case state.V2Sync1Event:
+				if len(data) == 128 && eType == RonFiExtractTypeHunting {
+					syncPairInfo = &V2SyncInfo{
+						address,
+						new(big.Int).SetBytes(data[82:96]),   // 96-14=82
+						new(big.Int).SetBytes(data[114:128]), // 128-14=114
 					}
 				}
 			case state.V2MintEvent, state.V2BurnEvent:
@@ -99,14 +108,16 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 						reserve1 = syncPairInfo.reserve1
 
 						key = fmt.Sprintf("%s-%d", address, dir^1)
+						keyToken = info.KeyToken
+						bothBriToken = info.BothBriToken
 						swapPairInfo := SwapPairInfo{
 							Address:      address,
 							Key:          key,
 							V3:           false,
-							BothBriToken: info.BothBriToken,
+							BothBriToken: bothBriToken,
 							TokenIn:      tokenIn,
 							TokenOut:     tokenOut,
-							KeyToken:     info.KeyToken,
+							KeyToken:     keyToken,
 							AmountIn:     amountIn,
 							AmountOut:    amountOut,
 							Reserve0:     reserve0,
@@ -156,14 +167,16 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 						reserve1 = syncPairInfo.reserve1
 
 						key = fmt.Sprintf("%s-%d", address, dir^1)
+						bothBriToken = info.BothBriToken
+						keyToken = info.KeyToken
 						swapPairInfo := SwapPairInfo{
 							Address:      address,
 							Key:          key,
 							V3:           false,
-							BothBriToken: info.BothBriToken,
+							BothBriToken: bothBriToken,
 							TokenIn:      tokenIn,
 							TokenOut:     tokenOut,
-							KeyToken:     info.KeyToken,
+							KeyToken:     keyToken,
 							AmountIn:     amountIn,
 							AmountOut:    amountOut,
 							Reserve0:     reserve0,
@@ -238,12 +251,83 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 					swapPairsInfo = append(swapPairsInfo, &swapPairInfo)
 				}
-			case state.V2SwapEvent:
+			case state.ApSwapEvent:
+				if len(data) == 160 && len(vlog.Topics) == 3 {
+					if eType == RonFiExtractTypeHunting {
+						continue
+					}
+
+					poolInfo = di.GetPoolInfo(address)
+					if poolInfo == nil {
+						continue
+					}
+
+					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
+					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					}
+					to = common.BytesToAddress(vlog.Topics[2].Bytes())
+					token0 := poolInfo.Token0
+					token1 := poolInfo.Token1
+
+					apAbi, err := abi.JSON(strings.NewReader(algebrapool.AlgebrapoolMetaData.ABI))
+					if err != nil {
+						continue
+					}
+					unpack, err := apAbi.Unpack("Swap", data)
+					if err != nil {
+						continue
+					}
+					amount0 := unpack[0].(*big.Int)
+					amount1 := unpack[1].(*big.Int)
+					price := unpack[2].(*big.Int)
+					liquidity := unpack[3].(*big.Int)
+					tick := int(unpack[4].(*big.Int).Int64())
+
+					dir = 0
+					if (amount0.Cmp(big.NewInt(0)) < 0) && (amount1.Cmp(big.NewInt(0)) > 0) {
+						dir = 1
+					}
+					if dir == 0 {
+						tokenIn = token0
+						tokenOut = token1
+						amountIn = new(big.Int).Abs(amount0)
+						amountOut = new(big.Int).Abs(amount1)
+					} else {
+						tokenIn = token1
+						tokenOut = token0
+						amountIn = new(big.Int).Abs(amount1)
+						amountOut = new(big.Int).Abs(amount0)
+					}
+					key = fmt.Sprintf("%s-%d", address, dir^1)
+					swapPairInfo := SwapPairInfo{
+						Address:      address,
+						Key:          key,
+						V3:           true,
+						BothBriToken: false,
+						TokenIn:      tokenIn,
+						TokenOut:     tokenOut,
+						KeyToken:     tokenIn,
+						AmountIn:     amountIn,
+						AmountOut:    amountOut,
+						Reserve0:     nil,
+						Reserve1:     nil,
+						Tick:         tick,
+						SqrtPriceX96: price,
+						Liquidity:    liquidity,
+						Dir:          uint64(dir),
+					}
+					swapPairsInfo = append(swapPairsInfo, &swapPairInfo)
+				}
+			case state.V2SwapEvent, state.SafeswapEvnet, state.VyperswapEvnet:
 				if len(data) == 128 && len(vlog.Topics) == 3 {
 					info = di.GetPairInfo(address)
 					if info == nil { // not a known pair (i.e. none loops contain this pair, and rpc query fails too), nothing we can do.
 						continue
 					}
+					bothBriToken = info.BothBriToken
+					keyToken = info.KeyToken
+
 					if eType == RonFiExtractTypeHunting && (syncPairInfo == nil || syncPairInfo.address != address) {
 						log.Warn("RonFi extractSwapPairInfo surprise", "dexTx", tx.Hash().String(), "pair", address, "event", state.EventName(topic0))
 						continue
@@ -298,6 +382,91 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 
 					hasSwapPairInfo = true
 				}
+			case state.LogSwapEvent:
+				if len(data) == 64 && len(vlog.Topics) == 4 {
+					if eType == RonFiExtractTypeHunting {
+						continue
+					}
+
+					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
+					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					}
+
+					to = common.BytesToAddress(vlog.Topics[1].Bytes())
+					fromToken := common.BytesToAddress(vlog.Topics[2].Bytes())
+					toToken := common.BytesToAddress(vlog.Topics[3].Bytes())
+					amountIn = new(big.Int).SetBytes(data[18:32]) // only need uint112 (i.e. 14 bytes)
+					amountOut = new(big.Int).SetBytes(data[50:64])
+					tokenIn = fromToken
+					tokenOut = toToken
+					_, _, direction := rcommon.SortTokens(fromToken, toToken)
+					dir = direction
+					if eType != RonFiExtractTypeStats {
+						if info = di.GetPairInfo(address); info == nil {
+							continue
+						}
+					}
+					key = fmt.Sprintf("%s-%d", address, dir^1)
+					hasSwapPairInfo = true
+				}
+			case state.DodoswapEvent:
+				if len(data) == 192 {
+					if eType == RonFiExtractTypeHunting {
+						continue
+					}
+
+					sender = common.BytesToAddress(data[140:160])
+					to = common.BytesToAddress(data[172:192])
+					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					}
+					fromToken := common.BytesToAddress(data[12:32])
+					toToken := common.BytesToAddress(data[44:64])
+					amountIn = new(big.Int).SetBytes(data[82:96]) // only need uint112 (i.e. 14 bytes)
+					amountOut = new(big.Int).SetBytes(data[114:128])
+
+					tokenIn = fromToken
+					tokenOut = toToken
+					_, _, direction := rcommon.SortTokens(fromToken, toToken)
+					dir = direction
+					if eType != RonFiExtractTypeStats {
+						if info = di.GetPairInfo(address); info == nil {
+							continue
+						}
+					}
+					key = fmt.Sprintf("%s-%d", address, dir^1)
+					hasSwapPairInfo = true
+				}
+			case state.OtuswapEvnet:
+				if len(data) == 128 && len(vlog.Topics) == 3 {
+					if eType == RonFiExtractTypeHunting {
+						continue
+					}
+
+					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
+					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					}
+					to = common.BytesToAddress(vlog.Topics[2].Bytes())
+
+					fromToken := common.BytesToAddress(data[12:32])
+					toToken := common.BytesToAddress(data[44:64])
+					amountIn = new(big.Int).SetBytes(data[82:96]) // only need uint112 (i.e. 14 bytes)
+					amountOut = new(big.Int).SetBytes(data[114:128])
+
+					tokenIn = fromToken
+					tokenOut = toToken
+					_, _, direction := rcommon.SortTokens(fromToken, toToken)
+					dir = direction
+					if eType != RonFiExtractTypeStats {
+						if info = di.GetPairInfo(address); info == nil {
+							continue
+						}
+					}
+					key = fmt.Sprintf("%s-%d", address, dir^1)
+					hasSwapPairInfo = true
+				}
 			}
 
 			if hasSwapPairInfo {
@@ -305,12 +474,12 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					address,
 					key,
 					false,
-					info.BothBriToken,
+					bothBriToken,
 					sender,
 					to,
 					tokenIn,
 					tokenOut,
-					info.KeyToken,
+					keyToken,
 					amountIn,
 					amountOut,
 					reserve0,
@@ -395,6 +564,7 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 	for _, pairInfo := range swapPairsInfo {
 		if pairInfo.V3 {
 			v3Loop = true
+			break
 		}
 	}
 

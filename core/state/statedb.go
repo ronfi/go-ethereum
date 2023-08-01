@@ -48,10 +48,19 @@ var (
 	TokenTransferEvent = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 	V2PairCreatedEvent = common.HexToHash("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9")
 	V2SyncEvent        = common.HexToHash("0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1")
+	V2Sync1Event       = common.HexToHash("0x2f9d55abfefdfd4c3a83e00a1b419b3c2fe4b83100c559f0e2213e57f6e0bba9")
+	V2Sync2Event       = common.HexToHash("0xcf2aa50876cdfbb541206f89af0ee78d44a2abf8d328e37fa4917f982149848a")
 	V2SwapEvent        = common.HexToHash("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
+	V2Swap1Event       = common.HexToHash("0x606ecd02b3e3b4778f8e97b2e03351de14224efaa5fa64e62200afc9395c2499")
+	LogSwapEvent       = common.HexToHash("0x908fb5ee8f16c6bc9bc3690973819f32a4d4b10188134543c88706e0e1d43378") // LOG_Swap event
+	DodoswapEvent      = common.HexToHash("0xc2c0245e056d5fb095f04cd6373bc770802ebd1e6c918eb78fdef843cdb37b0f") // DODO Swap event
+	OtuswapEvnet       = common.HexToHash("0x54787c404bb33c88e86f4baf88183a3b0141d0a848e6a9f7a13b66ae3a9b73d1") // OTU Swap (OptimizedTransparentUpgradeableProxy)
+	SafeswapEvnet      = common.HexToHash("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822") // SafeSwap
+	VyperswapEvnet     = common.HexToHash("0xb2e76ae99761dc136e598d4a629bb347eccb9532a5f8bbd72e18467c3c34cc98") // Vyper Swap
 	V2MintEvent        = common.HexToHash("0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f")
 	V2BurnEvent        = common.HexToHash("0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496")
 	V3SwapEvent        = common.HexToHash("0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67")
+	ApSwapEvent        = common.HexToHash("0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67") // AlgebraPool swap event
 	V3MintEvent        = common.HexToHash("0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde")
 )
 
