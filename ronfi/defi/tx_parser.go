@@ -194,9 +194,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())
 					token0 := poolInfo.Token0
 					token1 := poolInfo.Token1
@@ -263,9 +263,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())
 					token0 := poolInfo.Token0
 					token1 := poolInfo.Token1
@@ -333,9 +333,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 						continue
 					}
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())
 
 					token0 := info.Token0
@@ -396,9 +396,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					keyToken = info.KeyToken
 
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())
 
 					token0 := info.Token0
@@ -452,9 +452,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 
 					to = common.BytesToAddress(vlog.Topics[1].Bytes())
 					fromToken := common.BytesToAddress(vlog.Topics[2].Bytes())
@@ -481,9 +481,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 
 					sender = common.BytesToAddress(data[140:160])
 					to = common.BytesToAddress(data[172:192])
-					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 					fromToken := common.BytesToAddress(data[12:32])
 					toToken := common.BytesToAddress(data[44:64])
 					amountIn = new(big.Int).SetBytes(data[82:96]) // only need uint112 (i.e. 14 bytes)
@@ -508,9 +508,9 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
-						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					}
+					//if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
+					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					//}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())
 
 					fromToken := common.BytesToAddress(data[12:32])
@@ -681,8 +681,13 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 							prev := pairs[h]
 							next := pairs[h+1]
 							if prev.AmountOut == nil || next.AmountIn == nil || prev.AmountOut.Cmp(next.AmountIn) != 0 {
-								checkAmounts = false
-								break
+								difference := new(big.Int).Sub(prev.AmountOut, next.AmountIn)
+								scaledDiff := new(big.Int).Mul(difference.Abs(difference), big.NewInt(100))
+								diff := new(big.Int).Div(scaledDiff, prev.AmountOut).Uint64()
+								if diff > 1 {
+									checkAmounts = false
+									break
+								}
 							}
 						}
 
@@ -704,41 +709,23 @@ func (di *Info) loopProfit(swapPairsInfo []*SwapPairInfo) (profit float64) {
 		return
 	}
 
-	prev := swapPairsInfo[0]
-	next := swapPairsInfo[1]
-	// check if head/tail right?
-	if prev.AmountOut.Cmp(next.AmountIn) != 0 &&
-		next.AmountOut.Cmp(prev.AmountIn) == 0 {
-		// reverse
-		for i := len(swapPairsInfo)/2 - 1; i >= 0; i-- {
-			opp := len(swapPairsInfo) - 1 - i
-			swapPairsInfo[i], swapPairsInfo[opp] = swapPairsInfo[opp], swapPairsInfo[i]
-		}
-	}
-
 	head := swapPairsInfo[0]
 	tail := swapPairsInfo[len(swapPairsInfo)-1]
 	token := head.TokenIn
 
-	isTradableToken := false
 	amount := 0.0
 	defer func() {
 		// finally, we got the real profit
-		if isTradableToken {
-			price := GetTradingTokenPrice(token)
-			amount /= price
-			profit = amount * GetTradingTokenPrice(rcommon.USDC)
-		}
+		price := GetTradingTokenPrice(token)
+		amount /= price
+		profit = amount * GetTradingTokenPrice(rcommon.USDC)
 	}()
 
-	if head.TokenIn == tail.TokenOut {
-		if _, isTradableToken = rcommon.TradableTokens[token]; isTradableToken {
-			decimals := uint64(18)
-			if tInfo := di.GetTokenInfo(token); tInfo != nil {
-				decimals = tInfo.Decimals
-			}
-			amount = rcommon.TokenToFloat(new(big.Int).Sub(tail.AmountOut, head.AmountIn), decimals) // profit on tail
-		}
+	decimals := uint64(18)
+	if tInfo := di.GetTokenInfo(token); tInfo != nil {
+		decimals = tInfo.Decimals
 	}
+	amount = rcommon.TokenToFloat(new(big.Int).Sub(tail.AmountOut, head.AmountIn), decimals) // profit on tail
+
 	return
 }
