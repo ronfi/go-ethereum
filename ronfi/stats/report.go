@@ -300,7 +300,11 @@ func (s *Stats) obsReport(
 			suffix = "    copy success"
 		}
 		allRatio := s.obsStats.ratio(id)
-		profit, v3Hunting := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+		profit, v3Hunting, isArbTx := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+		if !isArbTx {
+			return
+		}
+
 		s.obsStats.updateGrossProfit(id, profit)
 		if v3Hunting {
 			s.obsStats.updateGrossV3Profit(id, profit)

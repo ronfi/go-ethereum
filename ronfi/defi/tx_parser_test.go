@@ -46,11 +46,11 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
 
-	profit, v3Hunting := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
+	profit, v3Hunting, isArbTx := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
 	if profit == 0.0 {
 		t.Fatal("TestInfo_GetArbTxProfit calculate profit failed!")
 	}
-	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v", v3Hunting, profit)
+	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v, isArbTx: %v", v3Hunting, profit, isArbTx)
 }
 
 func TestInfo_CheckIfObs(t *testing.T) {

@@ -621,8 +621,9 @@ func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router c
 	return
 }
 
-func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router common.Address) (float64, bool) {
+func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router common.Address) (float64, bool, bool) {
 	v3Loop := false
+	isArbTx := false
 	swapPairsInfo := di.ExtractSwapPairInfo(tx, router, vLogs, RonFiExtractTypeStats)
 	for _, pairInfo := range swapPairsInfo {
 		if pairInfo.V3 {
@@ -686,6 +687,7 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 						}
 
 						if checkAmounts {
+							isArbTx = true
 							totalProfit += di.loopProfit(pairs)
 						}
 					}
@@ -694,7 +696,7 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 		}
 	}
 
-	return totalProfit, v3Loop
+	return totalProfit, v3Loop, isArbTx
 }
 
 func (di *Info) loopProfit(swapPairsInfo []*SwapPairInfo) (profit float64) {
