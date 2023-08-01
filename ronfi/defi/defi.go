@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
+	dmm "github.com/ethereum/go-ethereum/ronfi/contracts/contract_dmm"
 	erc20token "github.com/ethereum/go-ethereum/ronfi/contracts/contract_erc20"
 	v2pair "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v2pair"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
@@ -26,6 +27,7 @@ const (
 )
 
 var (
+	DMMSwapIdMethod           = crypto.Keccak256([]byte("getTradeInfo()"))[:4]
 	UniSwapStandardSwapMethod = crypto.Keccak256([]byte("swap(uint256,uint256,address,bytes)"))[:4]
 )
 
@@ -256,7 +258,12 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 		canFlashLoan = false
 	}
 
-	pairInfo = di.getUniSwapPairInfo(pair)
+	if bytes.Contains(bytecode, DMMSwapIdMethod) {
+		pairInfo = di.getDMMSwapPairInfo(pair)
+	} else {
+		pairInfo = di.getUniSwapPairInfo(pair)
+	}
+
 	if pairInfo == nil {
 		//log.Warn("RonFi Defi get pair info failed", "pair", pair)
 		return
@@ -276,6 +283,31 @@ func (di *Info) GetPairInfo(pair common.Address) (pairInfo *PairInfo) {
 func (di *Info) getUniSwapPairInfo(pair common.Address) *PairInfo {
 	{
 		if inst, err := v2pair.NewV2pair(pair, di.client); err == nil {
+			if token0, err := inst.Token0(nil); err == nil {
+				if token1, err := inst.Token1(nil); err == nil {
+					if reserves, err := inst.GetReserves(nil); err == nil {
+						factory, err := inst.Factory(nil)
+						if err != nil {
+							factory = rcommon.ZeroAddress
+						}
+
+						name, err := inst.Name(nil)
+						if err != nil {
+							name = "pancake lp"
+						}
+						return di.buildPairInfo(pair, factory, token0, token1, name, reserves.Reserve0, reserves.Reserve1)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (di *Info) getDMMSwapPairInfo(pair common.Address) *PairInfo {
+	{
+		if inst, err := dmm.NewDmm(pair, di.client); err == nil {
 			if token0, err := inst.Token0(nil); err == nil {
 				if token1, err := inst.Token1(nil); err == nil {
 					if reserves, err := inst.GetReserves(nil); err == nil {

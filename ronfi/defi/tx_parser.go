@@ -319,7 +319,7 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 					swapPairsInfo = append(swapPairsInfo, &swapPairInfo)
 				}
-			case state.V2SwapEvent, state.SafeswapEvnet, state.VyperswapEvnet:
+			case state.V2SwapEvent, state.SafeswapEvent, state.VyperswapEvent:
 				if len(data) == 128 && len(vlog.Topics) == 3 {
 					info = di.GetPairInfo(address)
 					if info == nil { // not a known pair (i.e. none loops contain this pair, and rpc query fails too), nothing we can do.
@@ -334,6 +334,69 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 					}
 					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
 					if eType == RonFiExtractTypeStats && (sender != router) && (sender != address) {
+						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
+					}
+					to = common.BytesToAddress(vlog.Topics[2].Bytes())
+
+					token0 := info.Token0
+					token1 := info.Token1
+
+					amount0In := new(big.Int).SetBytes(data[18:32])    // only need uint112 (i.e. 14 bytes)
+					amount1In := new(big.Int).SetBytes(data[50:64])    //32+18
+					amount0Out := new(big.Int).SetBytes(data[82:96])   //64+18
+					amount1Out := new(big.Int).SetBytes(data[114:128]) //96+18
+
+					if amount0Out.BitLen() == 0 || amount1Out.BitLen() == 0 {
+						if amount0Out.BitLen() == 0 {
+							dir = 0
+							amountIn = amount0In
+							amountOut = amount1Out
+						} else {
+							dir = 1
+							amountIn = amount1In
+							amountOut = amount0Out
+						}
+					} else { // if both amount0/1Out are not zero, fallback to use amount0/1In to check direction
+						if amount1In.BitLen() == 0 {
+							dir = 0
+							amountIn = amount0In
+							amountOut = amount1Out
+						} else {
+							dir = 1
+							amountIn = amount1In
+							amountOut = amount0Out
+						}
+					}
+					if dir == 0 {
+						tokenIn = token0
+						tokenOut = token1
+					} else {
+						tokenIn = token1
+						tokenOut = token0
+					}
+					key = fmt.Sprintf("%s-%d", address, dir^1)
+					if eType == RonFiExtractTypeHunting {
+						reserve0 = syncPairInfo.reserve0
+						reserve1 = syncPairInfo.reserve1
+					}
+
+					hasSwapPairInfo = true
+				}
+			case state.V2Swap1Event:
+				if len(data) == 160 && len(vlog.Topics) == 3 {
+					if eType == RonFiExtractTypeHunting {
+						continue
+					}
+
+					info = di.GetPairInfo(address)
+					if info == nil { // not a known pair (i.e. none loops contain this pair, and rpc query fails too), nothing we can do.
+						continue
+					}
+					bothBriToken = info.BothBriToken
+					keyToken = info.KeyToken
+
+					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
+					if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
 						continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
 					}
 					to = common.BytesToAddress(vlog.Topics[2].Bytes())
@@ -575,18 +638,27 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 				pairs := swapPairsInfo[i : j+1]
 				if len(pairs) > 1 {
 					var k int
+
+					// check head in == tail out
+					head := pairs[0]
+					tail := pairs[len(pairs)-1]
+					if head.TokenIn != tail.TokenOut {
+						continue
+					}
+
+					// check linkage
 					for k = 0; k < len(pairs)-1; k++ {
-						head := pairs[0]
 						prev := pairs[k]
 						next := pairs[k+1]
-						tail := next
 						if prev.To != next.Address && prev.To != *tx.To() ||
-							prev.TokenOut != next.TokenIn ||
-							head.TokenIn != tail.TokenOut {
-							break
+							prev.TokenOut != next.TokenIn {
+							continue
 						}
 					}
+
+					// linkage ok, check profit
 					if k == len(pairs)-1 {
+						i = j + 1
 						totalProfit += di.loopProfit(pairs)
 					}
 				}
