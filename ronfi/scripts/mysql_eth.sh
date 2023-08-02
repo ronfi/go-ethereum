@@ -18,12 +18,9 @@ newDB(){
     create table if not exists osk_limited_pairs(id int not null auto_increment, pair char(66) not null unique, primary key(id));
     create table if not exists pair_dir_gas(id int not null auto_increment, pairDir char(44) not null unique, gas int, primary key(id));
     create table if not exists dex_pairs(id int not null auto_increment, pair char(44) not null unique, frequency int, primary key(id));
-    create table if not exists obs_routers(id int not null auto_increment, routerMethod char(60) not null unique, primary key(id));
-    create table if not exists obs_methods(id int not null auto_increment, methodID char(20) not null unique, obsInfo char(10), primary key(id));
     create table if not exists pairs(id int not null auto_increment, pair char(44) not null unique, name char(40), pairIndex int, bothBriToken tinyint(1), canFlashLoan tinyint(1), keyToken char(44), token0 char(44), token1 char(44), factory char(44), primary key(id));
     create table if not exists pools(id int not null auto_increment, pool char(44) not null unique, name char(40), token0 char(44), token1 char(44), fee int, tickSpacing int, factory char(44), primary key(id));
     create table if not exists tokens(id int not null auto_increment, token char(44) not null unique, symbol char(20), decimals int, primary key(id));
-    create table if not exists dex_routers(id int not null auto_increment, router char(44) not null unique, primary key(id));
   "
 }
 
