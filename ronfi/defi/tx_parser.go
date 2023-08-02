@@ -570,6 +570,7 @@ func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router c
 	}
 
 	swapPairsInfo := di.ExtractSwapPairInfo(tx, router, vLogs, RonFiExtractTypeStats)
+	totalPairsInAllLoops := 0
 	if len(swapPairsInfo) > 0 {
 		isDex = true
 		isObs = false
@@ -584,15 +585,22 @@ func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router c
 				for k := i; k <= j; k++ {
 					pairs = append(pairs, swapPairsInfo[k])
 				}
-				isObs = checkIfLoop(pairs, *tx.To())
-				if isObs {
+
+				if checkIfLoop(pairs, *tx.To()) {
 					isDex = false
-					return
+					isObs = true
+					totalPairsInAllLoops += len(pairs)
 				}
 			}
 		}
+
+		if isObs && totalPairsInAllLoops == len(swapPairsInfo) && totalPairsInAllLoops > 1 {
+			return
+		}
 	}
 
+	isDex = true
+	isObs = false
 	return
 }
 
@@ -608,6 +616,7 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 	}
 
 	totalProfit := 0.0
+	totalPairsInAllLoops := 0
 	if len(swapPairsInfo) > 1 {
 		for i := 0; i < len(swapPairsInfo); i++ {
 			for j := i + 1; j < len(swapPairsInfo); j++ {
@@ -617,10 +626,14 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 				}
 
 				if checkIfLoop(pairs, *tx.To()) {
-					isArbTx = true
+					totalPairsInAllLoops += len(pairs)
 					totalProfit += di.loopProfit(pairs)
 				}
 			}
+		}
+
+		if totalPairsInAllLoops == len(swapPairsInfo) {
+			isArbTx = true
 		}
 	}
 

@@ -36,12 +36,12 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 	}
 	info := NewInfo(client, dbInst)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x3da4302dbce80694a33c96b4dc5999013e6b281395ea4391f01f9a9934c172d8"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x7058aee966509fd467f8c35e390235d9180cca8dce5f92cc3f4f8180c9519161"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x3da4302dbce80694a33c96b4dc5999013e6b281395ea4391f01f9a9934c172d8"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x7058aee966509fd467f8c35e390235d9180cca8dce5f92cc3f4f8180c9519161"))
 	if err != nil {
 		t.Fatal("TestInfo_GetArbTxProfit TransactionReceipt failed!", "err", err)
 	}
@@ -80,12 +80,12 @@ func TestInfo_CheckIfObs(t *testing.T) {
 	}
 	info := NewInfo(client, dbInst)
 
-	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x4293af6c2c62ca28a405ee63ffc0efb4191674f802faa8532585f2ce371c34f6"))
+	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x7058aee966509fd467f8c35e390235d9180cca8dce5f92cc3f4f8180c9519161"))
 	if err != nil {
 		t.Fatal("TestInfo_CheckIfObs TransactionByHash failed!", "err", err)
 	}
 
-	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x4293af6c2c62ca28a405ee63ffc0efb4191674f802faa8532585f2ce371c34f6"))
+	receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash("0x7058aee966509fd467f8c35e390235d9180cca8dce5f92cc3f4f8180c9519161"))
 	if err != nil {
 		t.Fatal("TestInfo_CheckIfObs TransactionReceipt failed!", "err", err)
 	}
