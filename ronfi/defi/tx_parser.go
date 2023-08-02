@@ -1,10 +1,8 @@
 package defi
 
 import (
-	"encoding/binary"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	algebrapool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_algebrapool"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
@@ -570,49 +568,26 @@ func (di *Info) CheckIfObsTx(tx *types.Transaction, vLogs []*types.Log, router c
 	if len(data) < 4 {
 		return
 	}
-	methodID := uint64(binary.BigEndian.Uint32(data[:4]))
-
-	if _, isDex = txpool.DexRouters[*to]; isDex {
-		return
-	} else if _, isDex = txpool.DexMethodsTypical[methodID]; isDex {
-		return
-	} else if _, isObs = txpool.ObsMethods[methodID]; isObs {
-		return
-	}
-
-	if txpool.ObsRouters != nil {
-		routerMethod := fmt.Sprintf("%s-0x%08x", *to, methodID)
-		if _, isObs = txpool.ObsRouters[routerMethod]; isObs {
-			return
-		}
-	}
 
 	swapPairsInfo := di.ExtractSwapPairInfo(tx, router, vLogs, RonFiExtractTypeStats)
 	if len(swapPairsInfo) > 0 {
 		isDex = true
 		isObs = false
+		// dex transaction.
+		if len(swapPairsInfo) == 1 {
+			return
+		}
 
 		for i := 0; i < len(swapPairsInfo); i++ {
 			for j := i + 1; j < len(swapPairsInfo); j++ {
-				pairs := swapPairsInfo[i : j+1]
-				if len(pairs) > 1 {
-					var k int
-					for k = 0; k < len(pairs)-1; k++ {
-						head := pairs[0]
-						prev := pairs[k]
-						next := pairs[k+1]
-						tail := next
-						if prev.To != next.Address && prev.To != *to ||
-							prev.TokenOut != next.TokenIn ||
-							head.TokenIn != tail.TokenOut {
-							break
-						}
-					}
-					if k == len(pairs)-1 {
-						isDex = false
-						isObs = true
-						return
-					}
+				pairs := make([]*SwapPairInfo, 0, j+1-i)
+				for k := i; k <= j; k++ {
+					pairs = append(pairs, swapPairsInfo[k])
+				}
+				isObs = checkIfLoop(pairs, *tx.To())
+				if isObs {
+					isDex = false
+					return
 				}
 			}
 		}
@@ -640,62 +615,10 @@ func (di *Info) GetArbTxProfit(tx *types.Transaction, vLogs []*types.Log, router
 				for k := i; k <= j; k++ {
 					pairs = append(pairs, swapPairsInfo[k])
 				}
-				if len(pairs) > 1 {
-					var k int
 
-					// check head in == tail out
-					head := pairs[0]
-					tail := pairs[len(pairs)-1]
-					if head.TokenIn != tail.TokenOut {
-						continue
-					}
-
-					// for v3 flash swap, the logs of swap event is not in order
-					_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
-					if !tradableToken {
-						_, tradableToken = rcommon.OBSTradableTokens[head.TokenOut]
-						if !tradableToken {
-							continue
-						} else {
-							pairs[0], pairs[len(pairs)-1] = pairs[len(pairs)-1], pairs[0]
-							head = pairs[0]
-							tail = pairs[len(pairs)-1]
-						}
-					}
-
-					// check linkage
-					for k = 0; k < len(pairs)-1; k++ {
-						prev := pairs[k]
-						next := pairs[k+1]
-						if prev.To != next.Address && prev.To != *tx.To() ||
-							prev.TokenOut != next.TokenIn {
-							continue
-						}
-					}
-
-					// linkage ok, check profit
-					if k == len(pairs)-1 {
-						// check amounts in/out
-						checkAmounts := true
-						for h := 0; h < k; h++ {
-							prev := pairs[h]
-							next := pairs[h+1]
-							if prev.AmountOut == nil || next.AmountIn == nil || prev.AmountOut.Cmp(next.AmountIn) != 0 {
-								difference := new(big.Int).Sub(prev.AmountOut, next.AmountIn)
-								scaledDiff := new(big.Int).Mul(difference.Abs(difference), big.NewInt(100))
-								diff := new(big.Int).Div(scaledDiff, prev.AmountOut).Uint64()
-								if diff > 1 {
-									checkAmounts = false
-									break
-								}
-							}
-						}
-
-						if checkAmounts {
-							isArbTx = true
-							totalProfit += di.loopProfit(pairs)
-						}
-					}
+				if checkIfLoop(pairs, *tx.To()) {
+					isArbTx = true
+					totalProfit += di.loopProfit(pairs)
 				}
 			}
 		}
@@ -728,4 +651,63 @@ func (di *Info) loopProfit(swapPairsInfo []*SwapPairInfo) (profit float64) {
 	amount = rcommon.TokenToFloat(new(big.Int).Sub(tail.AmountOut, head.AmountIn), decimals) // profit on tail
 
 	return
+}
+
+func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
+	if len(pairs) > 1 {
+		var k int
+
+		// check head in == tail out
+		head := pairs[0]
+		tail := pairs[len(pairs)-1]
+		if head.TokenIn != tail.TokenOut {
+			return false
+		}
+
+		// for v3 flash swap, the logs of swap event is not in order
+		_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
+		if !tradableToken {
+			_, tradableToken = rcommon.OBSTradableTokens[head.TokenOut]
+			if !tradableToken {
+				return false
+			} else {
+				pairs[0], pairs[len(pairs)-1] = pairs[len(pairs)-1], pairs[0]
+				head = pairs[0]
+				tail = pairs[len(pairs)-1]
+			}
+		}
+
+		// check linkage
+		for k = 0; k < len(pairs)-1; k++ {
+			prev := pairs[k]
+			next := pairs[k+1]
+			if prev.To != next.Address && prev.To != to ||
+				prev.TokenOut != next.TokenIn {
+				continue
+			}
+		}
+
+		// linkage ok, check profit
+		if k == len(pairs)-1 {
+			// check amounts in/out
+			checkAmounts := true
+			for h := 0; h < k; h++ {
+				prev := pairs[h]
+				next := pairs[h+1]
+				if prev.AmountOut == nil || next.AmountIn == nil || prev.AmountOut.Cmp(next.AmountIn) != 0 {
+					difference := new(big.Int).Sub(prev.AmountOut, next.AmountIn)
+					scaledDiff := new(big.Int).Mul(difference.Abs(difference), big.NewInt(100))
+					diff := new(big.Int).Div(scaledDiff, prev.AmountOut).Uint64()
+					if diff > 1 {
+						checkAmounts = false
+						break
+					}
+				}
+			}
+
+			return checkAmounts
+		}
+	}
+
+	return false
 }

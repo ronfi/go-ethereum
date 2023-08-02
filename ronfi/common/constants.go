@@ -17,9 +17,6 @@ const (
 	RedisMsgCancelLoop      = "cancelLoop"
 	RedisMsgRestoreLoop     = "restoreLoop"
 	RedisMsgCancelKnowledge = "cancelKnowledge"
-	RedisMsgNewObsRouter    = "newObsRouter"
-	RedisMsgNewDexRouter    = "newDexRouter"
-	RedisMsgDelDexRouter    = "delDexRouter"
 )
 
 // internal

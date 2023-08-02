@@ -591,7 +591,7 @@ func handleRonfiTransactions(txs TransactionsPacket, peer *Peer, direct bool) {
 		}
 
 		if to := tx.To(); to != nil {
-			IsDexTx, _ := txpool.CheckIfDexTx(tx)
+			IsDexTx := txpool.CheckIfDexTx(tx)
 			if !IsDexTx {
 				continue
 			}

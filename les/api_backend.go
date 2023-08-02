@@ -354,12 +354,3 @@ func (b *LesApiBackend) ReloadLoops() {
 
 func (b *LesApiBackend) ResetStats() {
 }
-
-func (b *LesApiBackend) NewDexRouter(router string) {
-}
-
-func (b *LesApiBackend) NewObsRouter(routerMethod string) {
-}
-
-func (b *LesApiBackend) DelDexRouter(router string) {
-}

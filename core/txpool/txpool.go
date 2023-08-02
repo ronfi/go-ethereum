@@ -17,7 +17,6 @@
 package txpool
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -143,37 +142,6 @@ var (
 
 var (
 	RonFiSwapV3Address = common.HexToAddress("0x0C70A9dBC7e0704d344aa818FAE5cA6f0f73D534") // todo change to real address
-
-	ObsMethods map[uint64]struct{}
-	ObsRouters map[string]struct{}
-	DexRouters map[common.Address]struct{}
-
-	DexMethodsTypical = map[uint64]string{
-		0x38ed1739: "swapExactTokensForTokens", // amountIn fixed
-		0x5c11d795: "swapExactTokensForTokensSupportingFeeOnTransferTokens",
-		0x7ff36ab5: "swapExactETHForTokens", // amountIn fixed,	ETH -> TOK
-		0xb6f9de95: "swapExactETHForTokensSupportingFeeOnTransferTokens",
-		0x18cbafe5: "swapExactTokensForETH", // amountIn fixed,	TOK -> ETH
-		0x791ac947: "swapExactTokensForETHSupportingFeeOnTransferTokens",
-		0xd46d2f83: "swapExactTokensForBNBSupportingFeeOnTransferTokens",
-		0x8803dbee: "swapTokensForExactTokens", // amountOut fixed
-		0x4a25d94a: "swapTokensForExactETH",    // amountOut fixed,	TOK -> ETH
-		0xfb3bdb41: "swapETHForExactTokens",    // amountOut fixed,	ETH -> TOK
-		0x8332a963: "swapBNBForExactTokens",    // amountOut fixed
-		0xe8e33700: "addLiquidity",             //(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline)
-		0x57528cca: "addLiquidity",             //(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline, uint256 startingSwapTime)
-		0xf305d719: "addLiquidityETH",
-		0x6bb6a6f6: "addLiquidityETH", //(address token, uint256 amountTokenDesired, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline, uint256 startingSwapTime)
-		0xbaa2abde: "removeLiquidity",
-		0x2195995c: "removeLiquidityWithPermit",
-		0x02751cec: "removeLiquidityETH",
-		0xaf2979eb: "removeLiquidityETHSupportingFeeOnTransferTokens",
-		0xded9382a: "removeLiquidityETHWithPermit",
-		0x5b0d5984: "removeLiquidityETHWithPermitSupportingFeeOnTransferTokens",
-		0x5f575529: "metamask swap", // Function: swap(bytes data)  MetaMask also use it
-		0x7c025200: "1inch",
-		0x2e95b6c8: "1inch",
-	}
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -1692,29 +1660,6 @@ func (pool *TxPool) demoteUnexecutables() {
 	}
 }
 
-func (pool *TxPool) SetObs(obsRouters map[string]struct{}, obsMethods map[uint64]string) {
-	newObsRouters := make(map[string]struct{})
-	for routerMethod := range obsRouters {
-		newObsRouters[routerMethod] = struct{}{}
-	}
-	ObsRouters = newObsRouters
-	newObsMethods := make(map[uint64]struct{})
-	for methodID := range obsMethods {
-		newObsMethods[methodID] = struct{}{}
-	}
-	ObsMethods = newObsMethods
-	log.Info("RonFi SetObs", "size(ObsRouters)", len(ObsRouters), "size(ObsMethods)", len(ObsMethods))
-}
-
-func (pool *TxPool) SetDex(dexRouters map[common.Address]struct{}) {
-	newDexRouters := make(map[common.Address]struct{})
-	for router, id := range dexRouters {
-		newDexRouters[router] = id
-	}
-	DexRouters = newDexRouters
-	log.Info("RonFi SetDex", "size(DexRouters)", len(DexRouters))
-}
-
 // addressByHeartbeat is an account address tagged with its last activity timestamp.
 type addressByHeartbeat struct {
 	address   common.Address
@@ -1976,39 +1921,22 @@ func numSlots(tx *types.Transaction) int {
 }
 
 // CheckIfDexTx Check if Dex Transaction and if Obs Transaction
-func CheckIfDexTx(tx *types.Transaction) (bool, bool) {
+func CheckIfDexTx(tx *types.Transaction) bool {
 	to := tx.To()
 	if to == nil {
-		return false, false // not dex tx
+		return false
 	}
 
-	// check if dex router white list
-	if _, ok := DexRouters[*to]; ok {
-		tx.RonTxType = types.RonTxIsDexTx
-		return true, false
-	} else if *to == RonFiSwapV3Address {
+	if *to == RonFiSwapV3Address {
 		tx.RonTxType = types.RonTxIsArbTx // this flag is useful in eth/handler.go BroadcastTransactions()
-		return false, false
+		return false
 	}
 
 	data := tx.Data()
 	if len(data) < 4 {
-		return false, false // not dex tx
-	}
-
-	methodID := uint64(binary.BigEndian.Uint32(data[:4]))
-	// check if dex method white list
-	if _, ok := DexMethodsTypical[methodID]; ok {
+		return false
+	} else {
 		tx.RonTxType = types.RonTxIsDexTx
-		return true, false
-	} else if _, isObs := ObsMethods[methodID]; isObs {
-		tx.RonTxType = types.RonTxIsObsTx
-		return false, true // obs tx
-	} else if _, exist := ObsRouters[fmt.Sprintf("%s-0x%08x", to, methodID)]; exist {
-		tx.RonTxType = types.RonTxIsObsTx
-		return false, true // obs tx
+		return true
 	}
-
-	tx.RonTxType = types.RonTxIsDexTx
-	return true, false // dex tx
 }

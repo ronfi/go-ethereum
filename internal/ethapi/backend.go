@@ -78,9 +78,6 @@ type Backend interface {
 	StopArbing()
 	ReloadLoops()
 	ResetStats()
-	NewDexRouter(router string)
-	NewObsRouter(routerMethod string)
-	DelDexRouter(router string)
 
 	// Transaction pool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error

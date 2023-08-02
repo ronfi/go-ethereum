@@ -2,9 +2,6 @@ package stats
 
 import (
 	"context"
-	"encoding/binary"
-	"fmt"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/ronfi/db"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/go-redis/redis"
@@ -73,7 +70,6 @@ type Stats struct {
 	obsStats     ObsAllStatsMap
 	obsPairStats ObsAllPairStatsMap
 	loopsCol     *LoopsCollector
-	obsCol       *ObsCollector
 
 	pairMaxGasUsed  map[string]uint64
 	dexPairs        map[common.Address]uint64
@@ -82,8 +78,6 @@ type Stats struct {
 	dexTokensVol    map[common.Address]float64
 	dexPairsVol     map[common.Address]float64
 	prevResetTime   time.Time
-	obsMethods      map[uint64]string
-	obsRouters      map[string]struct{}
 }
 
 type miscStatCnt struct {
@@ -101,8 +95,6 @@ func NewStats(
 	mysql *db.Mysql,
 	pairGasMap map[string]uint64,
 	dexPairsMap map[common.Address]uint64,
-	obsRouters map[string]struct{},
-	obsMethods map[uint64]string,
 ) *Stats {
 	s := &Stats{
 		eth:    eth,
@@ -123,8 +115,6 @@ func NewStats(
 	s.dexTokensVol = make(map[common.Address]float64)
 	s.dexPairsVol = make(map[common.Address]float64)
 	s.topDexPairsInfo = make(map[common.Address]DexPairInfo)
-	s.obsRouters = obsRouters
-	s.obsMethods = obsMethods
 
 	s.obsContractStats = make(map[common.Address]uint64)
 	s.obsMethodStats = make(map[uint32]uint64)
@@ -170,9 +160,6 @@ func NewStats(
 
 	s.loopsCol = NewLoopsCollector(redis, mysql)
 	s.loopsCol.start()
-
-	s.obsCol = NewObsCollector(redis, mysql)
-	s.obsCol.start()
 
 	return s
 }
@@ -318,7 +305,6 @@ func (s *Stats) dexPairGasUsed(txs types.Transactions, receipts types.Receipts, 
 		}
 
 		// collect dex pairs
-		methodID := uint64(binary.BigEndian.Uint32(data[:4]))
 		swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypePairs)
 		for _, swapPairInfo := range swapPairsInfo {
 			// collect all dex pairs
@@ -342,28 +328,6 @@ func (s *Stats) dexPairGasUsed(txs types.Transactions, receipts types.Receipts, 
 				s.pairMaxGasUsed[key] = averageGasUsed - averageGasUsed/32 + receipt.GasUsed/32 // 31/32 * old + 1/32 * new, to filter any exceptional sharp peak
 			} else {
 				s.pairMaxGasUsed[key] = receipt.GasUsed
-			}
-		}
-
-		// collect obs routers info
-		// note: these collected obs method MUST NOT be used directly! which is highly possible to be reused by some other contracts but not obs!
-		//		 best practice is to manually check these obs methods and commit into github one by one! carefully!
-		_, IsObsTx := s.di.CheckIfObsTx(tx, receipt.Logs, *to)
-		if IsObsTx {
-			if txpool.ObsMethods != nil {
-				if _, exist := txpool.ObsMethods[methodID]; !exist {
-					// only if the methodId is not in the core.ObsMethods list, collect the obs routers info
-					if s.obsRouters != nil && to != nil {
-						routerMethod := fmt.Sprintf("%s-0x%08x", *to, methodID)
-						if _, exist := s.obsRouters[routerMethod]; !exist {
-							s.obsRouters[routerMethod] = struct{}{}
-							s.obsCol.notifyObs(&rcommon.NewObs{
-								RouterMethod: routerMethod,
-							})
-							log.Info("RonFi new obs found", "tx", tx.Hash().String(), "obs", tx.To(), "methodId", fmt.Sprintf("0x%08x", methodID))
-						}
-					}
-				}
 			}
 		}
 	}

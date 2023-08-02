@@ -53,16 +53,6 @@ func (oc *ObsCollector) stop() {
 func (oc *ObsCollector) run() {
 	for {
 		select {
-		case newObs := <-oc.newObsCh:
-			{
-				record := newObs.ToJsonNewObs()
-				res := oc.mysql.InsertObsRouter(record)
-				if res > 0 {
-					jsonData, _ := json.Marshal(record)
-					oc.rdb.Publish(rcommon.RedisMsgNewObsRouter, string(jsonData))
-				}
-			}
-
 		case obsRecord := <-oc.obsRecordCh:
 			{
 				loops, _ := json.Marshal(obsRecord.loops)
@@ -77,10 +67,6 @@ func (oc *ObsCollector) run() {
 			return
 		}
 	}
-}
-
-func (oc *ObsCollector) notifyObs(newObs *rcommon.NewObs) {
-	oc.newObsCh <- newObs
 }
 
 func (oc *ObsCollector) notifyObsRecord(obsRecord *ObsRecord) {

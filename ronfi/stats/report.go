@@ -339,7 +339,7 @@ func (s *Stats) parseObs(
 			if size > 69 {
 				simpleSum = simpleCheckSum(data[4:size-64]) + block // add block number to avoid duplicated on different block
 			}
-			obsLoop, dbLoop, ok := parseObs5Input(s.di, data)
+			_, dbLoop, ok := parseObs5Input(s.di, data)
 			if ok {
 				if len(receipt.Logs) > 0 { // for success arb, check which pairs are used here
 					for i := 0; i < len(dbLoop.Path); i++ {
@@ -347,14 +347,6 @@ func (s *Stats) parseObs(
 						s.obsPairStats.update(id, pair)
 					}
 				}
-			}
-
-			if obsLoop != nil {
-				s.obsCol.notifyObsRecord(&ObsRecord{
-					tx,
-					id,
-					obsLoop,
-				})
 			}
 		}
 	case Obs6:
@@ -363,7 +355,7 @@ func (s *Stats) parseObs(
 			if size == 77 {
 				simpleSum = simpleCheckSum(data[4:size-64]) + block // add block number to avoid duplicated on different block
 			}
-			obsLoop, dbLoop, ok := parseObs6Input(s.di, data)
+			_, dbLoop, ok := parseObs6Input(s.di, data)
 			if ok {
 				if len(receipt.Logs) > 0 { // for success arb, check which pairs are used here
 					for i := 0; i < len(dbLoop.Path); i++ {
@@ -371,14 +363,6 @@ func (s *Stats) parseObs(
 						s.obsPairStats.update(id, pair)
 					}
 				}
-			}
-
-			if obsLoop != nil {
-				s.obsCol.notifyObsRecord(&ObsRecord{
-					tx,
-					id,
-					obsLoop,
-				})
 			}
 		}
 	default:

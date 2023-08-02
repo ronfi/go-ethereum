@@ -2,7 +2,6 @@ package ronfi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/db"
@@ -43,9 +42,6 @@ type RonArbiter struct {
 	v3LoopsDb         *uniswap.V3Loops
 	pairGasMap        map[string]uint64         // the gas required for a pair swap (key: pair+dir)
 	dexPairsMap       map[common.Address]uint64 // collection of all dex pairs
-	dexRouters        map[common.Address]struct{}
-	obsRouters        map[string]struct{}
-	obsMethods        map[uint64]string
 
 	client *ethclient.Client
 
@@ -95,65 +91,12 @@ func (r *RonArbiter) ResetStats() {
 	}
 }
 
-func (r *RonArbiter) NewObsRouter(routerMethod string) {
-	log.Info("RonFi NewObsRouter", "routerMethod", routerMethod)
-	if r.mysql != nil {
-		jsonObs := &rcommon.JsonNewObs{
-			RouterMethod: routerMethod,
-		}
-		res := r.mysql.InsertObsRouter(jsonObs)
-		log.Info("RonFi NewObsRouter insert mysql done!", "routerMethod", routerMethod, "res", res)
-		if res > 0 && r.rdb != nil {
-			jsonData, _ := json.Marshal(jsonObs)
-			r.rdb.Publish(rcommon.RedisMsgNewObsRouter, jsonData)
-			log.Info("RonFi NewObsRouter publish redis done!", "routerMethod", routerMethod)
-		}
-	}
-}
-
-func (r *RonArbiter) NewDexRouter(router string) {
-	log.Info("RonFi NewDexRouter", "router", router)
-	if r.mysql != nil {
-		jsonDex := &rcommon.JsonNewDex{
-			Router: router,
-		}
-		res := r.mysql.InsertDexRouter(jsonDex)
-		log.Info("RonFi NewDexRouter insert mysql done!", "router", router, "res", res)
-		if res > 0 && r.rdb != nil {
-			jsonData, _ := json.Marshal(jsonDex)
-			r.rdb.Publish(rcommon.RedisMsgNewDexRouter, jsonData)
-			log.Info("RonFi NewDexRouter publish redis done!", "router", router)
-		}
-	}
-}
-
-func (r *RonArbiter) DelDexRouter(router string) {
-	log.Info("RonFi DelDexRouter", "router", router)
-	if r.mysql != nil {
-		jsonDex := &rcommon.JsonNewDex{
-			Router: router,
-		}
-		res := r.mysql.DelDexRouter(jsonDex)
-		log.Info("RonFi DelDexRouter delete mysql done!", "router", router, "res", res)
-		if res >= 0 && r.rdb != nil {
-			jsonData, _ := json.Marshal(jsonDex)
-			r.rdb.Publish(rcommon.RedisMsgDelDexRouter, jsonData)
-			log.Info("RonFi DelDexRouter publish redis done!", "router", router)
-		}
-	}
-}
-
 func (r *RonArbiter) ReloadLoops() {
 	if rpc.StartTrading {
 		log.Warn("RonFi arb ReloadLoops Reject on Trading")
 	} else {
 		r.pairGasMap = r.mysql.LoadPairGas()
 		r.dexPairsMap = r.mysql.LoadDexPairs()
-		r.obsRouters = r.mysql.LoadObsRouters()
-		r.obsMethods = r.mysql.LoadObsMethods()
-		r.dexRouters = r.mysql.LoadDexRouters()
-		r.eth.TxPool().SetDex(r.dexRouters)
-		r.eth.TxPool().SetObs(r.obsRouters, r.obsMethods)
 
 		pairsInfo := make(defi.PairInfoMap)
 		for address, info := range r.di.GetAllPairInfo() {
@@ -204,7 +147,7 @@ func (r *RonArbiter) StartStats() {
 		return
 	}
 	// start stats service
-	r.stats = stats.NewStats(r.eth, r.client, r.di, r.rdb, r.mysql, r.GetPairGas(), r.GetDexPairs(), r.obsRouters, r.obsMethods)
+	r.stats = stats.NewStats(r.eth, r.client, r.di, r.rdb, r.mysql, r.GetPairGas(), r.GetDexPairs())
 	if r.stats == nil {
 		log.Warn("RonFi stats service started failed")
 	} else {
@@ -293,7 +236,7 @@ func (r *RonArbiter) mainLoop() {
 
 func (r *RonArbiter) GetTransaction(hash string) *types.Transaction {
 	// connect speedy client
-	client, err := ethclient.Dial("https://nd-814-711-835.p2pify.com/049f42c7290c310495b6940701e2ae14")
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
 	if err != nil {
 		log.Info("RonFi GetTransaction connect rpc provider failed", "tx", hash)
 		return nil
