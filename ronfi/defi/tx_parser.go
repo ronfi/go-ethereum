@@ -660,9 +660,6 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 		// check head in == tail out
 		head := pairs[0]
 		tail := pairs[len(pairs)-1]
-		if head.TokenIn != tail.TokenOut {
-			return false
-		}
 
 		// for v3 flash swap, the logs of swap event is not in order
 		_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
@@ -675,6 +672,9 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 				head = pairs[0]
 				tail = pairs[len(pairs)-1]
 			}
+		}
+		if head.TokenIn != tail.TokenOut {
+			return false
 		}
 
 		// check linkage
