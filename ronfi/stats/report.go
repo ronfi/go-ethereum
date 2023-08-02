@@ -316,6 +316,8 @@ func (s *Stats) obsReport(
 			"b", block,
 			"index", receipt.TransactionIndex,
 			"e", abbrFrom,
+			"gp", tx.GasPrice(),
+			"gas", receipt.GasUsed,
 			"f", rcommon.Float2Str(txFeeInUSD, 3),
 			"t", s.obsStats.getTotalSuccess(id),
 			"ok(%)", rcommon.Float2Str(allRatio, 1),

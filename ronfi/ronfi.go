@@ -184,13 +184,10 @@ func (r *RonArbiter) mainLoop() {
 
 		case <-oracle.C:
 			if r.oracleInitialized {
-				//if err := gopool.Submit(func() {
-				//	// update token price in every 5 minutes
-				//	defi.UpdateTokenPrices()
-				//}); err != nil {
-				//	log.Error("RonFi mainLoop: gopool.Submit() failed", "reason", err)
-				//	continue
-				//}
+				go func() {
+					// update token price in every 5 minutes
+					defi.UpdateTokenPrices()
+				}()
 			} else {
 				// price oracle initialization
 				if r.client != nil && !defi.InitRonFiOracle(r.client) {
