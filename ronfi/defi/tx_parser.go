@@ -682,8 +682,9 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 			prev := pairs[k]
 			next := pairs[k+1]
 			if prev.To != next.Address && prev.To != to ||
-				prev.TokenOut != next.TokenIn {
-				continue
+				prev.TokenOut != next.TokenIn ||
+				prev.Address == next.Address {
+				return false
 			}
 		}
 

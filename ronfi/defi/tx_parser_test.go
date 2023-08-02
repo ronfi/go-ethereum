@@ -48,7 +48,7 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 
 	profit, v3Hunting, isArbTx := info.GetArbTxProfit(tx, receipt.Logs, *tx.To())
 	if profit == 0.0 {
-		t.Fatal("TestInfo_GetArbTxProfit calculate profit failed!")
+		t.Fatalf("TestInfo_GetArbTxProfit calculate profit failed, v3: %v, profit: %v, isArbTx: %v", v3Hunting, profit, isArbTx)
 	}
 	t.Logf("TestInfo_GetArbTxProfit, v3: %v, profit: %v, isArbTx: %v", v3Hunting, profit, isArbTx)
 }
