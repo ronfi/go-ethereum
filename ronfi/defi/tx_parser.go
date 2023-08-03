@@ -59,7 +59,7 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 			address := vlog.Address
 			switch topic0 {
 			case state.TokenTransferEvent:
-				if len(data) == 32 && len(vlog.Topics) == 3 && len(swapPairsInfo) == 0 {
+				if len(data) == 32 && len(vlog.Topics) == 3 {
 					from := common.BytesToAddress(vlog.Topics[1].Bytes())
 					to := common.BytesToAddress(vlog.Topics[2].Bytes())
 					amount := new(big.Int).SetBytes(data[18:32])
@@ -575,6 +575,47 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 		}
 	}
 
+	// check if flash swap, if yes, we should adjust pair infos order
+	if len(swapPairsInfo) > 1 {
+		headPair := swapPairsInfo[0]
+		lastPair := swapPairsInfo[len(swapPairsInfo)-1]
+
+		isFlashLoan := false
+		lastLoanToRouter := false
+		for _, ev := range transferEvents {
+			if ev.token == lastPair.TokenOut &&
+				ev.from == lastPair.Address &&
+				ev.amount.Cmp(lastPair.AmountOut) == 0 {
+				if ev.to == headPair.Address {
+					isFlashLoan = true
+					break
+				} else if ev.to == *tx.To() {
+					lastLoanToRouter = true
+				}
+			}
+		}
+
+		if lastLoanToRouter {
+			for i := 0; i < len(transferEvents); i++ {
+				target := transferEvents[i]
+				for j := i + 1; j < len(transferEvents); j++ {
+					ev := transferEvents[j]
+					if target.token == ev.token &&
+						target.to == ev.from &&
+						target.amount.Cmp(ev.amount) == 0 &&
+						ev.to == headPair.Address {
+						isFlashLoan = true
+					}
+				}
+			}
+		}
+
+		if isFlashLoan {
+			// swap first and last pair
+			swapPairsInfo[0], swapPairsInfo[len(swapPairsInfo)-1] = swapPairsInfo[len(swapPairsInfo)-1], swapPairsInfo[0]
+		}
+	}
+
 	return swapPairsInfo
 }
 
@@ -693,11 +734,6 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 		// check head in == tail out
 		head := pairs[0]
 		tail := pairs[len(pairs)-1]
-		if tail.To == head.Address {
-			pairs[0], pairs[len(pairs)-1] = pairs[len(pairs)-1], pairs[0]
-			head = pairs[0]
-			tail = pairs[len(pairs)-1]
-		}
 
 		// for v3 flash swap, the logs of swap event is not in order
 		if _, ok := rcommon.OBSTradableTokens[head.TokenIn]; !ok {
