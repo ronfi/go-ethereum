@@ -21,6 +21,13 @@ type V2SyncInfo struct {
 	reserve1 *big.Int
 }
 
+type TransferEvents struct {
+	token  common.Address
+	from   common.Address
+	to     common.Address
+	amount *big.Int
+}
+
 type RonFiExtractType uint32
 
 const (
@@ -33,6 +40,7 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 	var syncPairInfo *V2SyncInfo // there must have a 'sync' event before any 'swap'/'mint'/'burn' event.
 
 	swapPairsInfo := make([]*SwapPairInfo, 0, len(vLogs)/2)
+	transferEvents := make([]*TransferEvents, 0, len(vLogs))
 
 	for _, vlog := range vLogs {
 		var (
@@ -50,6 +58,18 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 			data := vlog.Data
 			address := vlog.Address
 			switch topic0 {
+			case state.TokenTransferEvent:
+				if len(data) == 32 && len(vlog.Topics) == 3 {
+					from := common.BytesToAddress(vlog.Topics[1].Bytes())
+					to := common.BytesToAddress(vlog.Topics[2].Bytes())
+					amount := new(big.Int).SetBytes(data[18:32])
+					transferEvents = append(transferEvents, &TransferEvents{
+						address,
+						from,
+						to,
+						amount,
+					})
+				}
 			case state.V2PairCreatedEvent:
 				if len(data) >= 32 && len(vlog.Topics) == 3 {
 					log.Info("RonFi extractSwapPairInfo pair created", "dexTx", tx.Hash().String(), "pair", address)
@@ -555,6 +575,21 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 		}
 	}
 
+	// check if flash swap, if yes, we should adjust pair infos order
+	if len(swapPairsInfo) > 1 {
+		headPair := swapPairsInfo[0]
+		lastPair := swapPairsInfo[len(swapPairsInfo)-1]
+		for _, ev := range transferEvents {
+			if ev.token == lastPair.TokenOut &&
+				ev.from == lastPair.Address &&
+				ev.to == headPair.Address &&
+				ev.amount.Cmp(lastPair.AmountOut) == 0 {
+				// swap first and last pair
+				swapPairsInfo[0], swapPairsInfo[len(swapPairsInfo)-1] = swapPairsInfo[len(swapPairsInfo)-1], swapPairsInfo[0]
+			}
+		}
+	}
+
 	return swapPairsInfo
 }
 
@@ -675,17 +710,10 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 		tail := pairs[len(pairs)-1]
 
 		// for v3 flash swap, the logs of swap event is not in order
-		_, tradableToken := rcommon.OBSTradableTokens[head.TokenIn]
-		if !tradableToken {
-			_, tradableToken = rcommon.OBSTradableTokens[head.TokenOut]
-			if !tradableToken {
-				return false
-			} else {
-				pairs[0], pairs[len(pairs)-1] = pairs[len(pairs)-1], pairs[0]
-				head = pairs[0]
-				tail = pairs[len(pairs)-1]
-			}
+		if _, ok := rcommon.OBSTradableTokens[head.TokenIn]; !ok {
+			return false
 		}
+
 		if head.TokenIn != tail.TokenOut {
 			return false
 		}
