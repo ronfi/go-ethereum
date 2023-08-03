@@ -579,14 +579,40 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 	if len(swapPairsInfo) > 1 {
 		headPair := swapPairsInfo[0]
 		lastPair := swapPairsInfo[len(swapPairsInfo)-1]
+
+		isFlashLoan := false
+		lastLoanToRouter := false
 		for _, ev := range transferEvents {
 			if ev.token == lastPair.TokenOut &&
 				ev.from == lastPair.Address &&
-				ev.to == headPair.Address &&
 				ev.amount.Cmp(lastPair.AmountOut) == 0 {
-				// swap first and last pair
-				swapPairsInfo[0], swapPairsInfo[len(swapPairsInfo)-1] = swapPairsInfo[len(swapPairsInfo)-1], swapPairsInfo[0]
+				if ev.to == headPair.Address {
+					isFlashLoan = true
+					break
+				} else if ev.to == *tx.To() {
+					lastLoanToRouter = true
+				}
 			}
+		}
+
+		if lastLoanToRouter {
+			for i := 0; i < len(transferEvents); i++ {
+				target := transferEvents[i]
+				for j := i + 1; j < len(transferEvents); j++ {
+					ev := transferEvents[j]
+					if target.token == ev.token &&
+						target.to == ev.from &&
+						target.amount.Cmp(ev.amount) == 0 &&
+						ev.to == headPair.Address {
+						isFlashLoan = true
+					}
+				}
+			}
+		}
+
+		if isFlashLoan {
+			// swap first and last pair
+			swapPairsInfo[0], swapPairsInfo[len(swapPairsInfo)-1] = swapPairsInfo[len(swapPairsInfo)-1], swapPairsInfo[0]
 		}
 	}
 
