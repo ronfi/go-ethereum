@@ -59,7 +59,7 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 			address := vlog.Address
 			switch topic0 {
 			case state.TokenTransferEvent:
-				if len(data) == 32 && len(vlog.Topics) == 3 {
+				if len(data) == 32 && len(vlog.Topics) == 3 && len(swapPairsInfo) == 0 {
 					from := common.BytesToAddress(vlog.Topics[1].Bytes())
 					to := common.BytesToAddress(vlog.Topics[2].Bytes())
 					amount := new(big.Int).SetBytes(data[18:32])
@@ -581,31 +581,20 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 		lastPair := swapPairsInfo[len(swapPairsInfo)-1]
 
 		isFlashLoan := false
-		lastLoanToRouter := false
+		var lastTransEvent *TransferEvents
+		// find head tokenIn source
 		for _, ev := range transferEvents {
-			if ev.token == lastPair.TokenOut &&
-				ev.from == lastPair.Address &&
-				ev.amount.Cmp(lastPair.AmountOut) == 0 {
-				if ev.to == headPair.Address {
-					isFlashLoan = true
-					break
-				} else if ev.to == *tx.To() {
-					lastLoanToRouter = true
-				}
-			}
-		}
-
-		if lastLoanToRouter {
-			for i := 0; i < len(transferEvents); i++ {
-				target := transferEvents[i]
-				for j := i + 1; j < len(transferEvents); j++ {
-					ev := transferEvents[j]
-					if target.token == ev.token &&
-						target.to == ev.from &&
-						target.amount.Cmp(ev.amount) == 0 &&
-						ev.to == headPair.Address {
+			if ev.token == headPair.TokenIn {
+				if ev.from == lastPair.Address {
+					if ev.to == headPair.Address {
 						isFlashLoan = true
+					} else if ev.to == *tx.To() {
+						lastTransEvent = ev
 					}
+				} else if ev.from == *tx.To() &&
+					lastTransEvent != nil &&
+					ev.amount.Cmp(lastTransEvent.amount) == 0 {
+					isFlashLoan = true
 				}
 			}
 		}
