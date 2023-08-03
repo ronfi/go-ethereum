@@ -747,7 +747,7 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 		// linkage ok, check profit
 		if k == len(pairs)-1 {
 			// check amounts in/out
-			//checkAmounts := true
+			checkAmounts := true
 			for h := 0; h < k; h++ {
 				prev := pairs[h]
 				next := pairs[h+1]
@@ -757,13 +757,13 @@ func checkIfLoop(pairs []*SwapPairInfo, to common.Address) bool {
 					diff := new(big.Int).Div(scaledDiff, prev.AmountOut).Uint64()
 					if diff > 50 {
 						log.Warn("RonFi big amount gap between two pairs", "prev", prev.Address, "next", next.Address, "diff", diff)
+						checkAmounts = false
+						break
 					}
 				}
 			}
 
-			//return checkAmounts
-
-			return true
+			return checkAmounts
 		}
 	}
 
