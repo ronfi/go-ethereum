@@ -32,12 +32,6 @@ var (
 //}
 
 func Flashbot(flashRpc *flashbotsrpc.BuilderBroadcastRPC, currentBlock uint64, txs []*types.Transaction) {
-	//urls := []string{
-	//	//"https://relay.flashbots.net",
-	//	"https://relay-goerli.flashbots.net",
-	//	// Refer to https://www.mev.to/builders for builder endpoints
-	//}
-
 	var (
 		dexTx []byte
 		arbTx []byte
@@ -63,6 +57,6 @@ func Flashbot(flashRpc *flashbotsrpc.BuilderBroadcastRPC, currentBlock uint64, t
 		if result.Err != nil {
 			log.Warn("Falshbot broadcast failed", "tx", txs[i].Hash().String(), "err", result.Err)
 		}
-		fmt.Printf("%+v\n", result.BundleResponse)
+		log.Info("RonFi Flashbot", "response", result.BundleResponse.BundleHash)
 	}
 }
