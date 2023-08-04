@@ -434,8 +434,6 @@ func (v *V3Loops) ReversedEdge(edge *Edge) *Edge {
 }
 
 func isStaledPools(di *defi.Info, addr, token0, token1 common.Address) bool {
-	return false
-
 	isBriPool := false
 	_, ok0 := rcommon.BridgeTokens[token0]
 	_, ok1 := rcommon.BridgeTokens[token1]
