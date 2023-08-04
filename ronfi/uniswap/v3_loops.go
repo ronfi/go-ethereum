@@ -130,10 +130,6 @@ func (g *Graph) DFS(node *Edge, targetEdge *Edge, currentPath []*Edge, result *[
 		return
 	}
 
-	if node.Tag.Pair == common.HexToAddress("0x4763784c16adbccb8fe42a8a7bae43f3bd848eee") {
-		fmt.Printf("matched!\n")
-	}
-
 	// Append current node to current path
 	currentPath = append(currentPath, node)
 
