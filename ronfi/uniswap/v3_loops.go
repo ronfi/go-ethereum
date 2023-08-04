@@ -11,11 +11,12 @@ import (
 )
 
 type TaggedEdge struct {
-	Pair     common.Address
-	Dir      int
-	PoolType PoolType
-	PoolFee  uint64
-	GasNeed  uint64
+	Pair         common.Address
+	Dir          int
+	PoolType     PoolType
+	PoolFee      uint64
+	GasNeed      uint64
+	BothBriToken bool
 }
 
 func (t *TaggedEdge) ID() string {
@@ -64,6 +65,22 @@ func (c *Cycle) CheckIfTradableInputToken() bool {
 		_, ok := rcommon.TradableTokens[edge0.Source]
 		if !ok {
 			return false
+		}
+	}
+
+	return true
+}
+
+func (c *Cycle) CheckIfAllBridgeTokens() bool {
+	if len(*c) == 0 {
+		return false
+	} else {
+		for _, edge := range *c {
+			_, ok1 := rcommon.BridgeTokens[edge.Source]
+			_, ok2 := rcommon.BridgeTokens[edge.Target]
+			if !ok1 || !ok2 {
+				return false
+			}
 		}
 	}
 
@@ -153,7 +170,15 @@ func (g *Graph) FindCyclesWithDedicatedEdges(dedicatedEdges []*Edge, hops int) [
 	for _, edge := range dedicatedEdges {
 		path := []*Edge{edge}
 		foundCycles, _ := g.DFS(edge.Target, edge.Source, visitedEdges, path, hops)
-		cycles = append(cycles, foundCycles...)
+		if edge.Tag.BothBriToken {
+			for _, cycle := range foundCycles {
+				if cycle.CheckIfAllBridgeTokens() {
+					cycles = append(cycles, cycle)
+				}
+			}
+		} else {
+			cycles = append(cycles, foundCycles...)
+		}
 	}
 	// filter same Pair cycles and non-tradable token cycles
 	filteredCycles := make([]Cycle, 0, len(cycles))
@@ -286,7 +311,6 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	dedicatedEdges := []*Edge{edge}
 
 	cycles := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 2)
-	//if len(cycles) < 0 {
 	cycles3 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 3)
 	if len(cycles3) < 0 {
 		cycles4 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 4)
@@ -297,7 +321,6 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	if len(cycles) > 24 {
 		cycles = cycles[:24]
 	}
-	//}
 
 	for _, cycle := range cycles {
 		validCycle := true
@@ -407,11 +430,12 @@ func ToV3Edge(pairInfo *defi.SwapPairInfo) *Edge {
 	}
 
 	taggedEdge := &TaggedEdge{
-		Pair:     pairInfo.Address,
-		Dir:      int(pairInfo.Dir),
-		PoolType: poolType,
-		PoolFee:  0,
-		GasNeed:  0,
+		Pair:         pairInfo.Address,
+		Dir:          int(pairInfo.Dir),
+		PoolType:     poolType,
+		PoolFee:      0,
+		GasNeed:      0,
+		BothBriToken: pairInfo.BothBriToken,
 	}
 
 	return &Edge{
