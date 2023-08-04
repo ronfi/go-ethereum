@@ -239,14 +239,14 @@ func TestUniswap_NewV3Loops(t *testing.T) {
 	}
 
 	taggedEdge := &TaggedEdge{
-		Pair:     common.HexToAddress("0xD9F3a5A0e7499149538cDEE8B804a5Ac4f4944Fc"),
-		Dir:      1,
-		PoolType: V2,
+		Pair:     common.HexToAddress("0x4763784c16adbccb8fe42a8a7bae43f3bd848eee"),
+		Dir:      0,
+		PoolType: V3,
 		GasNeed:  500000,
 	}
 	edge := &Edge{
-		Source: common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),
-		Target: common.HexToAddress("0x8185Bc4757572Da2a610f887561c32298f1A5748"),
+		Source: common.HexToAddress("0x807534B396919783B7e30383Fe57D857BC084338"),
+		Target: common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),
 		Tag:    taggedEdge,
 	}
 

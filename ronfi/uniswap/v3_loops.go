@@ -7,7 +7,6 @@ import (
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"math/big"
-	"sync"
 )
 
 type TaggedEdge struct {
@@ -44,6 +43,17 @@ func (c *Cycle) String() string {
 	}
 	//str += c[0].Source.Hex()
 	return str
+}
+
+func (c *Cycle) Id() common.Hash {
+	size := len(*c) * 20
+	serialized := make([]byte, 0, size)
+	for _, edge := range *c {
+		serialized = append(serialized, edge.Tag.Pair.Bytes()...)
+	}
+
+	hash := rcommon.RawHash(serialized)
+	return common.BytesToHash(hash)
 }
 
 func (c *Cycle) HasDupPair() bool {
@@ -102,74 +112,69 @@ func (c *Cycle) CheckIfV3OnHeadTail() bool {
 }
 
 type Graph struct {
-	nodes   map[common.Address][]*Edge
-	visited map[common.Address]bool
-	lock    sync.RWMutex
+	Nodes map[common.Address][]*Edge
 }
 
 func NewGraph() *Graph {
 	return &Graph{
-		nodes:   make(map[common.Address][]*Edge),
-		visited: make(map[common.Address]bool),
-		lock:    sync.RWMutex{},
+		Nodes: make(map[common.Address][]*Edge),
 	}
 }
 
 func (g *Graph) AddEdge(edge *Edge) {
-	g.lock.Lock()
-	defer func() {
-		g.lock.Unlock()
-	}()
-	g.nodes[edge.Source] = append(g.nodes[edge.Source], edge)
+	g.Nodes[edge.Source] = append(g.Nodes[edge.Source], edge)
 }
 
-func (g *Graph) DFS(src, target common.Address, visitedEdges map[string]bool, path []*Edge, hops int) ([]Cycle, bool) {
-	if len(path) >= hops {
-		return nil, false
+func (g *Graph) DFS(node *Edge, targetEdge *Edge, currentPath []*Edge, result *[]Cycle, maxLevel int) {
+	if node == nil || maxLevel <= 0 {
+		return
 	}
 
-	g.lock.Lock()
-	g.visited[src] = true
-	g.lock.Unlock()
-	found := false
-	var cycles []Cycle
+	if node.Tag.Pair == common.HexToAddress("0x4763784c16adbccb8fe42a8a7bae43f3bd848eee") {
+		fmt.Printf("matched!\n")
+	}
 
-	for _, edge := range g.nodes[src] {
-		g.lock.Lock()
-		visited := g.visited[edge.Target]
-		g.lock.Unlock()
-		if edge.Target == target {
-			cycles = append(cycles, append(path, edge))
-			found = true
-		} else if !visited && !visitedEdges[edge.Tag.ID()] {
-			visitedEdges[edge.Tag.ID()] = true
-			newPath := append(path, edge)
-			foundCycles, cycleFound := g.DFS(edge.Target, target, visitedEdges, newPath, hops)
-			if cycleFound {
-				found = true
-				cycles = append(cycles, foundCycles...)
-			}
-			visitedEdges[edge.Tag.ID()] = false
+	// Append current node to current path
+	currentPath = append(currentPath, node)
+
+	// Check if the current path contains the sub-slice
+	for _, edge := range currentPath {
+		if edge.Tag.ID() == targetEdge.Tag.ID() &&
+			currentPath[0].Source == currentPath[len(currentPath)-1].Target &&
+			currentPath[0].Source == rcommon.WETH {
+			// Add a copy of the current path to the result
+			pathCopy := make(Cycle, len(currentPath))
+			copy(pathCopy, currentPath)
+			*result = append(*result, pathCopy)
 		}
 	}
 
-	g.lock.Lock()
-	g.visited[src] = false
-	g.lock.Unlock()
-	return cycles, found
+	if node.Target == rcommon.WETH {
+		return
+	}
+
+	// Continue DFS for neighboring nodes
+	for _, neighbor := range g.Nodes[node.Target] {
+		if neighbor.Tag.Pair == node.Tag.Pair {
+			continue
+		}
+		g.DFS(neighbor, targetEdge, currentPath, result, maxLevel-1)
+	}
+
+	// Backtrack: remove current node from current path
+	currentPath = currentPath[:len(currentPath)-1]
 }
 
 func (g *Graph) FindCyclesWithDedicatedEdges(dedicatedEdges []*Edge, hops int) []Cycle {
 	var cycles []Cycle
-	visitedEdges := make(map[string]bool)
 
+	foundCycles := make([]Cycle, 0, 24)
 	for _, edge := range dedicatedEdges {
-		visitedEdges[edge.Tag.ID()] = true
-	}
+		for _, src := range g.Nodes[rcommon.WETH] {
+			path := make([]*Edge, 0, 6)
+			g.DFS(src, edge, path, &foundCycles, hops-1)
+		}
 
-	for _, edge := range dedicatedEdges {
-		path := []*Edge{edge}
-		foundCycles, _ := g.DFS(edge.Target, edge.Source, visitedEdges, path, hops)
 		if edge.Tag.BothBriToken {
 			for _, cycle := range foundCycles {
 				if cycle.CheckIfAllBridgeTokens() {
@@ -232,13 +237,20 @@ func NewV3Loops(
 		if gasNeed > 150000 {
 			gasNeed = 150000
 		}
-		g.AddEdge(&Edge{Source: info.Token0, Target: info.Token1, Tag: &TaggedEdge{
+
+		source := info.Token0
+		target := info.Token1
+		if source.Big().Cmp(target.Big()) > 0 {
+			source, target = target, source
+		}
+
+		edge := &Edge{Source: source, Target: target, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      0,
 			PoolType: V2,
 			PoolFee:  info.Fee,
 			GasNeed:  gasNeed,
-		}})
+		}}
 
 		key = fmt.Sprintf("%s-%d", addr, 1)
 		gasNeed, ok = pairGasMap[key]
@@ -248,13 +260,18 @@ func NewV3Loops(
 		if gasNeed > 150000 {
 			gasNeed = 150000
 		}
-		g.AddEdge(&Edge{Source: info.Token1, Target: info.Token0, Tag: &TaggedEdge{
+
+		source, target = target, source
+		reversedEdge := &Edge{Source: source, Target: target, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      1,
 			PoolType: V2,
 			PoolFee:  info.Fee,
 			GasNeed:  gasNeed,
-		}})
+		}}
+
+		g.AddEdge(edge)
+		g.AddEdge(reversedEdge)
 	}
 
 	for addr, info := range poolsInfo {
@@ -272,12 +289,19 @@ func NewV3Loops(
 		if gasNeed > 150000 {
 			gasNeed -= 150000
 		}
-		g.AddEdge(&Edge{Source: info.Token0, Target: info.Token1, Tag: &TaggedEdge{
+
+		source := info.Token0
+		target := info.Token1
+		if source.Big().Cmp(target.Big()) > 0 {
+			source, target = target, source
+		}
+
+		edge := &Edge{Source: source, Target: target, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      0,
 			PoolType: V3,
 			GasNeed:  gasNeed,
-		}})
+		}}
 		key = fmt.Sprintf("%s-%d", addr, 1)
 		gasNeed, ok = pairGasMap[key]
 		if !ok {
@@ -286,12 +310,17 @@ func NewV3Loops(
 		if gasNeed > 150000 {
 			gasNeed -= 150000
 		}
-		g.AddEdge(&Edge{Source: info.Token1, Target: info.Token0, Tag: &TaggedEdge{
+
+		source, target = target, source
+		reversedEdge := &Edge{Source: source, Target: target, Tag: &TaggedEdge{
 			Pair:     addr,
 			Dir:      1,
 			PoolType: V3,
 			GasNeed:  gasNeed,
-		}})
+		}}
+
+		g.AddEdge(edge)
+		g.AddEdge(reversedEdge)
 	}
 	log.Info("RonFi V3Loops", "total staled v2 pairs", totalStaledV2Pairs, "total staled v3 pools", totalStaledV3Pools)
 
@@ -306,9 +335,10 @@ func NewV3Loops(
 }
 
 func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
+	redupMaps := make(map[common.Hash]*Cycle)
 	arbs := make([]V3ArbPath, 0)
 	// find cycles
-	dedicatedEdges := []*Edge{edge}
+	dedicatedEdges := []*Edge{v.ReversedEdge(edge)}
 
 	cycles := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 2)
 	cycles3 := v.g.FindCyclesWithDedicatedEdges(dedicatedEdges, 3)
@@ -323,6 +353,12 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	}
 
 	for _, cycle := range cycles {
+		if _, ok := redupMaps[cycle.Id()]; !ok {
+			redupMaps[cycle.Id()] = &cycle
+		} else {
+			continue
+		}
+
 		validCycle := true
 		path := make(V3ArbPath, 0, len(cycle))
 		for _, edge := range cycle {
@@ -376,7 +412,30 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 	return arbs
 }
 
+func (v *V3Loops) ReversedEdge(edge *Edge) *Edge {
+	if edge == nil {
+		return nil
+	}
+
+	gasNeed := v.pairGasMap[fmt.Sprintf("%s-%d", edge.Tag.Pair, 1-edge.Tag.Dir)]
+
+	return &Edge{
+		Source: edge.Target,
+		Target: edge.Source,
+		Tag: &TaggedEdge{
+			Pair:         edge.Tag.Pair,
+			Dir:          1 - edge.Tag.Dir,
+			PoolType:     edge.Tag.PoolType,
+			PoolFee:      edge.Tag.PoolFee,
+			GasNeed:      gasNeed,
+			BothBriToken: edge.Tag.BothBriToken,
+		},
+	}
+}
+
 func isStaledPools(di *defi.Info, addr, token0, token1 common.Address) bool {
+	return false
+
 	isBriPool := false
 	_, ok0 := rcommon.BridgeTokens[token0]
 	_, ok1 := rcommon.BridgeTokens[token1]
