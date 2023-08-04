@@ -354,3 +354,6 @@ func (b *LesApiBackend) ReloadLoops() {
 
 func (b *LesApiBackend) ResetStats() {
 }
+
+func (b *LesApiBackend) SimTrading(hash string) {
+}

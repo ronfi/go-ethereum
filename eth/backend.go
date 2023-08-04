@@ -572,3 +572,7 @@ func (s *Ethereum) ReloadLoops() {
 func (s *Ethereum) ResetStats() {
 	s.ronArbiter.ResetStats()
 }
+
+func (s *Ethereum) SimTrading(hash string) {
+	s.ronArbiter.SimTrading(hash)
+}

@@ -432,3 +432,7 @@ func (b *EthAPIBackend) ReloadLoops() {
 func (b *EthAPIBackend) ResetStats() {
 	b.eth.ResetStats()
 }
+
+func (b *EthAPIBackend) SimTrading(hash string) {
+	b.eth.SimTrading(hash)
+}

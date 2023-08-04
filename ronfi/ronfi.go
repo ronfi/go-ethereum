@@ -259,3 +259,61 @@ func (r *RonArbiter) GetTransaction(hash string) *types.Transaction {
 
 	return tx
 }
+
+func (r *RonArbiter) SimTrading(hash string) {
+	// connect speedy client
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
+	if err != nil {
+		log.Info("RonFi GetTransaction connect rpc provider failed", "tx", hash)
+		return
+	}
+
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
+
+	b, err := hexutil.Decode(hash)
+	if err != nil {
+		log.Info("RonFi SimTrading decode string to bytes failed!", "tx", hash)
+		return
+	}
+	txHash := common.BytesToHash(b)
+
+	tx, _, err := client.TransactionByHash(context.Background(), txHash)
+	if err != nil {
+		log.Info("RonFi SimTrading retrieve transaction failed!", "tx", hash)
+		return
+	}
+
+	receipt, err := client.TransactionReceipt(context.Background(), txHash)
+	if err != nil {
+		log.Info("RonFi SimTrading retrieve transaction receipt failed!", "tx", hash)
+		return
+	}
+
+	swapPairsInfo := r.di.ExtractSwapPairInfo(tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypeStats)
+	if len(swapPairsInfo) > 0 {
+		for i, info := range swapPairsInfo {
+			edge := uniswap.ToV3Edge(info)
+			if edge == nil {
+				continue
+			}
+
+			arbs := r.v3LoopsDb.FindLoops(edge)
+			if len(arbs) == 0 {
+				log.Info("RonFi SimTrading no matched loops!", "idx", i, "tx", tx.Hash().String(), "pair", info.Address)
+				continue
+			} else {
+				for _, arb := range arbs {
+					log.Info("RonFi SimTrading matched loops",
+						"idx", i,
+						"tx", tx.Hash().String(),
+						"pair", info.Address,
+						"loop", arb.String())
+				}
+			}
+		}
+	}
+}
