@@ -58,7 +58,15 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 	//} else {
 	//	options.GasPrice = tx.GasPrice()
 	//}
-	options.GasPrice = big.NewInt(0)
+
+	//var baseFee *big.Int
+	//if feeHis, err := w.client.FeeHistory(context.Background(), 1, new(big.Int).SetUint64(w.currentBlockNum), nil); err != nil {
+	//	log.Warn("RonFi swap transaction, FeeHistory failed, err=%s", err)
+	//} else {
+	//	baseFee = feeHis.BaseFee[0]
+	//}
+
+	options.GasPrice = w.gasPrice
 	options.NoSend = true //only return signedTx
 
 	path := make([]common.Address, 0, len(bestProfit.Cycle.PoolAddresses)*2)
@@ -126,7 +134,7 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 		txs := make([]*types.Transaction, 0, 2)
 		txs = append(txs, tx)
 		txs = append(txs, arbTx)
-		Flashbot(flashRpc, w.currentBlockNum, txs)
+		Flashbot(flashRpc, w.currentBlock, w.currentBlockNum, txs)
 		return true, arbTx
 
 	} else {

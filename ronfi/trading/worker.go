@@ -1,6 +1,7 @@
 package trading
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
@@ -150,6 +151,7 @@ type Worker struct {
 	currentBlockHash common.Hash
 	currentBlockNum  uint64
 	currentBlock     *types.Block
+	gasPrice         *big.Int
 	done             chan struct{}
 
 	currentBlockReceivedTime mclock.AbsTime
@@ -238,6 +240,13 @@ func (w *Worker) Init(executorPrivateKey string, pairGasMap map[string]uint64, v
 	w.currentBlockNum = w.chain.CurrentBlock().Number.Uint64()
 	w.currentBlock = w.chain.GetBlockByNumber(w.currentBlockNum)
 	w.currentBlockHash = w.currentBlock.Hash()
+	var baseFee *big.Int
+	if feeHis, err := w.client.FeeHistory(context.Background(), 1, new(big.Int).SetUint64(w.currentBlockNum), nil); err != nil {
+		log.Warn("RonFi swap transaction, FeeHistory failed, err=%s", err)
+	} else {
+		baseFee = feeHis.BaseFee[0]
+	}
+	w.gasPrice = new(big.Int).Mul(baseFee, big.NewInt(2))
 	w.appState, _ = w.chain.StateAt(w.currentBlock.Root())
 	w.idleState = w.appState.Copy()
 	w.nonceState = w.appState.Copy()
@@ -387,7 +396,7 @@ func (w *Worker) stateDbsUpdate() {
 	w.idleStateDbsLock.Unlock()
 	// let 'stateDbLoop' do the remaining copy job
 	if err := w.PushStateDbsCopyEvent(); err != nil {
-		log.Warn("RonFi push StateDbsCopyEvent", "error", err)
+		log.Warn("RonFi stateDbsUpdate push StateDbsCopyEvent", "error", err)
 	}
 }
 
@@ -407,7 +416,7 @@ func (w *Worker) stateDbsConsumeOneCopy() (blockHash common.Hash, stateDb *state
 		stateDb = w.idleState.Copy()
 		w.idleStateDbsLock.Unlock()
 		if err := w.PushStateDbsCopyEvent(); err != nil {
-			log.Warn("RonFi push StateDbsCopyEvent", "error", err)
+			log.Warn("RonFi stateDbsConsumeOneCopy -- 11 -- push StateDbsCopyEvent", "error", err)
 		}
 		log.Warn("RonFi idleStateDbs run out, fallback to local copy")
 		return
@@ -418,7 +427,7 @@ func (w *Worker) stateDbsConsumeOneCopy() (blockHash common.Hash, stateDb *state
 	w.idleStateDbsLock.Unlock()
 	if remains <= maxStateDbsCopies/2 { // half of stateDbs have been consumed
 		if err := w.PushStateDbsCopyEvent(); err != nil {
-			log.Warn("RonFi push StateDbsCopyEvent", "error", err)
+			log.Warn("RonFi stateDbsConsumeOneCopy -- 22 -- push StateDbsCopyEvent", "error", err)
 		}
 	}
 	return
@@ -525,6 +534,14 @@ func (w *Worker) workLoop() {
 					w.appLock.Unlock()
 					w.stateDbsUpdate()
 					w.currentBlockReceivedTime = mclock.Now()
+
+					var baseFee *big.Int
+					if feeHis, err := w.client.FeeHistory(context.Background(), 1, new(big.Int).SetUint64(w.currentBlockNum), nil); err != nil {
+						log.Warn("RonFi swap transaction, FeeHistory failed, err=%s", err)
+					} else {
+						baseFee = feeHis.BaseFee[0]
+					}
+					w.gasPrice = new(big.Int).Mul(baseFee, big.NewInt(2))
 				}
 
 			case <-reportTimer.C:
@@ -716,13 +733,10 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 				profitInToken := rcommon.EthBigInt2Float64(profit.Profit.BestProfit)
 				grossProfitInUsd := profitInToken / price * defi.GetTradingTokenPrice(rcommon.USDC)
 
-				//txFeeInBnb := rcommon.EthBigInt2Float64(new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
-				//txFeeInUsd := txFeeInBnb * defi.GetTradingTokenPrice(rcommon.USDC)
-				//txFeeInToken := price * txFeeInBnb
-				txFeeInBnb := 0.0
-				txFeeInUsd := 0.0
+				txFeeInBnb := rcommon.EthBigInt2Float64(new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
+				txFeeInUsd := txFeeInBnb * defi.GetTradingTokenPrice(rcommon.USDC)
 				txFeeInToken := price * txFeeInBnb
-				netProfitInUsd := grossProfitInUsd - txFeeInUsd
+				netProfitInUsd := grossProfitInUsd/2.0 - txFeeInUsd
 				profitDetail := ProfitDetail{
 					loopName:         arb.String(),
 					targetToken:      profit.Cycle.InputToken,
@@ -754,7 +768,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 			highestProfit := profits[0]
 
 			if highestProfit.netProfitInUsd > w.minHuntingProfit {
-				log.Info("RonFi huntingTxEvent early hunting",
+				log.Info("RonFi huntingTxEvent hunting",
 					"i", i, "loops", len(arbs),
 					"loop", highestProfit.loopName, "netProfitInUsd", highestProfit.netProfitInUsd)
 
