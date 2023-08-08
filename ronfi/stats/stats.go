@@ -210,6 +210,7 @@ func (s *Stats) Run() {
 					for _, id := range ProfitObsIds {
 						s.obsProfitReport(id)
 					}
+					s.profitReport()
 
 					s.UpdatePairTokensInfo()
 
