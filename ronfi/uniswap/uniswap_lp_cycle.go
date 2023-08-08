@@ -609,22 +609,6 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 	l := -1
 	h := 3
 	var minIn, maxIn, lower, upper *big.Int
-	if lpCycle.TargetPool != nil {
-		for i, pool := range lpCycle.PoolAddresses {
-			if pool == lpCycle.TargetPool.Address {
-				// skip target pool
-				amountIn := lpCycle.TargetPool.AmountIn
-				if amountIn != nil && amountIn.BitLen() != 0 {
-					minOut := new(big.Int).Div(amountIn, big.NewInt(50))
-					maxOut := new(big.Int).Mul(amountIn, big.NewInt(50))
-					minIn = lpCycle.CalculateMaxInAmount(minOut, i)
-					maxIn = lpCycle.CalculateMaxInAmount(maxOut, i)
-				}
-				break
-			}
-		}
-	}
-
 	epsExp := int64(1e14) // i.e. 10^-4
 	switch lpCycle.InputToken {
 	case rcommon.BTCB:
@@ -643,29 +627,9 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 		epsExp = 1e16 // i.e. (10^-2)*1800 = $1.8
 	}
 
-	if maxIn != nil && minIn != nil {
-		if minIn.Cmp(maxIn) >= 0 {
-			minIn = new(big.Int).Div(maxIn, big.NewInt(1000))
-		}
-	} else if maxIn != nil && minIn == nil {
-		minIn = new(big.Int).Div(maxIn, big.NewInt(1000))
-	} else if maxIn == nil && minIn != nil {
-		maxIn = new(big.Int).Mul(minIn, big.NewInt(1000))
-	}
-
 	eps := big.NewInt(epsExp)
-	minBound := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetInt64(int64(int(lpCycle.InputTokenDecimals)-8)), nil)
-	if minIn == nil || maxIn == nil ||
-		minIn.Cmp(v3.ZERO) == 0 || maxIn.Cmp(v3.ZERO) == 0 ||
-		minIn.Cmp(minBound) < 0 || maxIn.Cmp(minBound) < 0 {
-		minIn = new(big.Int).Exp(big.NewInt(10), new(big.Int).SetInt64(int64(int(lpCycle.InputTokenDecimals)+l)), nil)
-		maxIn = new(big.Int).Exp(big.NewInt(10), new(big.Int).SetInt64(int64(int(lpCycle.InputTokenDecimals)+h)), nil)
-	} else {
-		if new(big.Int).Div(maxIn, minIn).Cmp(big.NewInt(1000)) > 0 {
-			maxIn = new(big.Int).Mul(minIn, big.NewInt(1000))
-		}
-		eps = minIn
-	}
+	minIn = new(big.Int).Exp(big.NewInt(10), new(big.Int).SetInt64(int64(int(lpCycle.InputTokenDecimals)+l)), nil)
+	maxIn = new(big.Int).Exp(big.NewInt(10), new(big.Int).SetInt64(int64(int(lpCycle.InputTokenDecimals)+h)), nil)
 
 	lower = minIn
 	upper = maxIn
