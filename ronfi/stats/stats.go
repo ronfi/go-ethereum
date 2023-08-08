@@ -34,14 +34,10 @@ type Stats struct {
 	startTime           mclock.AbsTime
 	initialBalance      atomic.Value
 	prevBalance         atomic.Value
-	v3InitialBalance    atomic.Value
-	v3PrevBalance       atomic.Value
 	prevReportResetTime time.Time
 
-	chiBalance   uint64
-	bnbBalance   float64
-	v3ChiBalance uint64
-	v3BnbBalance float64
+	chiBalance uint64
+	ethBalance float64
 
 	totalArbTxs           uint64
 	reportedTotalArbTxs   uint64
@@ -104,8 +100,6 @@ func NewStats(
 	}
 	s.initialBalance.Store(defi.RonFiBalance{})
 	s.prevBalance.Store(defi.RonFiBalance{})
-	s.v3InitialBalance.Store(defi.RonFiBalance{})
-	s.v3PrevBalance.Store(defi.RonFiBalance{})
 
 	s.startTime = mclock.Now()
 	s.prevResetTime = time.Now()
@@ -135,21 +129,14 @@ func NewStats(
 	s.rdb = redis
 	s.mysql = mysql
 
-	balance := s.di.GetAllBalance(rcommon.AllTradingExecutors, false)
-	balanceV3 := s.di.GetAllBalance(rcommon.AllV3TradingExecutors, true)
+	balance := s.di.GetAllBalance(rcommon.AllTradingExecutors)
 	log.Info("RonFi Stats Init",
 		"Initial Executor Eth", balance.Eth,
-		"Initial Contract Balance in USD", balance.ContractTotal,
-		"Initial V3 Executor Eth", balanceV3.Eth,
-		"Initial V3 Contract Balance in USD", balanceV3.ContractTotal)
+		"Initial Contract Balance in USD", balance.ContractTotal)
 	s.initialBalance.Store(balance.Copy())
 	s.prevBalance.Store(balance)
 	s.chiBalance = balance.ContractChi
-	s.bnbBalance = balance.Eth
-	s.v3InitialBalance.Store(balanceV3.Copy())
-	s.v3PrevBalance.Store(balanceV3.Copy())
-	s.v3ChiBalance = balanceV3.ContractChi
-	s.v3BnbBalance = balanceV3.Eth
+	s.ethBalance = balance.Eth
 
 	PrevBlockTxs = 0
 
@@ -239,8 +226,7 @@ func (s *Stats) Run() {
 					// reset report automatically at every day 8:00am
 					if blockTime := time.Unix(int64(s.currentHeader.Time), 0); blockTime.Day() != s.prevReportResetTime.Day() {
 						s.prevReportResetTime = blockTime
-						s.initialBalance.Store(s.di.GetAllBalance(rcommon.AllTradingExecutors, false))
-						s.v3InitialBalance.Store(s.di.GetAllBalance(rcommon.AllV3TradingExecutors, true))
+						s.initialBalance.Store(s.di.GetAllBalance(rcommon.AllTradingExecutors))
 						s.ResetStats()
 						s.startTime = mclock.Now()
 						log.Info("RonFi arb reset report for a wonderful new day", "block", s.currentHeader.Number)

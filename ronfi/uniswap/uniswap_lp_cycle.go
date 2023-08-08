@@ -614,17 +614,17 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 	case rcommon.BTCB:
 		l = -7
 		h = 4
-		epsExp = 1e14 // i.e. $3
+		epsExp = 1e13 // i.e. $0.3
 	case rcommon.DAI:
 	case rcommon.USDT:
 	case rcommon.USDC:
 		l = -3
 		h = 7
-		epsExp = 1e18 // i.e. $3
+		epsExp = 1e17 // i.e. $0.3
 	case rcommon.WETH:
 		l = -6
 		h = 5
-		epsExp = 1e16 // i.e. (10^-2)*1800 = $1.8
+		epsExp = 1e15 // i.e. (10^-3)*1800 = $0.18
 	}
 
 	eps := big.NewInt(epsExp)
@@ -661,7 +661,7 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 
 		lpCycle.best.swapAmount = new(big.Int).Set(swapAmount)
 		lpCycle.best.profitAmount = new(big.Int).Set(bestProfit)
-		// log.Warn("RonFi CalculateArbitrage succeed", "hops", len(lpCycle.pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "elapsed", mclock.Since(startTime).String())
+		log.Warn("RonFi CalculateArbitrage succeed", "hops", len(lpCycle.pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "elapsed", mclock.Since(startTime).String())
 
 		return &ProfitAmount{
 			Iters:      iters,

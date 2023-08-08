@@ -109,7 +109,7 @@ func (di *Info) ronTokensBalance(token common.Address) *big.Int {
 	return nil
 }
 
-func (di *Info) GetAllBalance(executors []common.Address, v3 bool) RonFiBalance {
+func (di *Info) GetAllBalance(executors []common.Address) RonFiBalance {
 	ronBalance := RonFiBalance{}
 
 	totalValue := 0.0

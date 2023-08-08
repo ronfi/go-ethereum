@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 type TargetDexInfo struct {
@@ -144,7 +145,7 @@ func (s *Stats) report(header *types.Header) {
 					// maybe chain reorg
 					continue
 				}
-				//log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
+				log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
 			}
 		} else if isObs {
 			from, _ := types.Sender(signer, tx)
@@ -578,6 +579,98 @@ func (s *Stats) obsProfitReport(id ObsId) {
 		"grossV3($)", rcommon.Float2Str(grossV3, 2),
 		"huntingRate(‰)", huntingRate,
 		"txs", obsTotalArbTxs,
+		"runtime", mclock.Since(s.startTime),
+	)
+}
+
+func (s *Stats) profitReport() {
+	log.Info("RonFi arb")
+	balance := s.di.GetAllBalance(rcommon.AllV3TradingExecutors)
+	initialBalance := s.initialBalance.Load().(defi.RonFiBalance)
+	log.Info("RonFi arb bot report price",
+		"eth", defi.GetTokenPrice(rcommon.WETH),
+		"btc", defi.GetTokenPrice(rcommon.BTCB),
+	)
+	shortFee := s.totalFee - s.reportedTotalFee
+	shortFeeUsd := shortFee * defi.GetTokenPrice(rcommon.WETH)
+	if balance.ContractChi > s.chiBalance+10 {
+		// current CHI is more than last time balance, must be re-charged
+		initialBalance.ContractChi += balance.ContractChi - s.chiBalance // todo: no way to know the chi consumed in recent 10 minutes
+		s.initialBalance.Store(initialBalance)
+		log.Warn("RonFi arb chi charged", "add", balance.ContractChi-s.chiBalance)
+		log.Info("RonFi arb bot fee: (short)", "$", rcommon.Float2Str(shortFeeUsd, 2), "eth", rcommon.Float2Str(shortFee, 6), "chi", "?")
+	} else {
+		log.Info("RonFi arb bot fee: (short)", "$", rcommon.Float2Str(shortFeeUsd, 2), "eth", rcommon.Float2Str(shortFee, 6), "chi", s.chiBalance-balance.ContractChi)
+	}
+	charged := float64(0)
+	if s.ethBalance-balance.Eth+0.1 < shortFee {
+		// executors balance charged, need to adjust the initial balance
+		charged = balance.Eth + shortFee - s.ethBalance
+		initialBalance.Eth += charged
+		s.initialBalance.Store(initialBalance)
+		log.Warn("RonFi arb executors charged", "eth", rcommon.Float2Str(charged, 6))
+	}
+	s.chiBalance = balance.ContractChi
+	s.ethBalance = balance.Eth
+	s.reportedTotalFee = s.totalFee
+	totalFeeUsd := s.totalFee * defi.GetTokenPrice(rcommon.WETH)
+	log.Info("RonFi arb bot fee: (total)",
+		"$", rcommon.Float2Str(totalFeeUsd, 2),
+		"bnb", rcommon.Float2Str(s.totalFee, 6),
+		"chi", initialBalance.ContractChi-balance.ContractChi,
+		"balance(eth)", rcommon.Float2Str(balance.Eth, 6),
+		"balance(chi)", balance.ContractChi,
+	)
+	log.Info("RonFi arb bot profit:",
+		"weth", rcommon.Float2Str(balance.ContractEth-initialBalance.ContractEth, 6),
+		"usdx", rcommon.Float2Str(balance.ContractUsdx-initialBalance.ContractUsdx, 2),
+		"reportBlock", s.currentHeader.Number,
+	)
+
+	copyRate := 0.0
+	total := s.totalSuccess + s.totalFail
+	if total > 0 {
+		copyRate = float64(s.totalCopied) / float64(total) * 100
+	}
+	log.Info("RonFi arb txs copied", "copyRate(%)", copyRate, "totalCopied", s.totalCopied)
+
+	totalArbTxs := atomic.LoadUint64(&s.totalArbTxs)
+	txSent := totalArbTxs - s.reportedTotalArbTxs
+	s.reportedTotalArbTxs = totalArbTxs
+
+	huntingRate := float64(txSent) / float64(s.txCount-s.reportedTxCount) * 1000
+	missingRate := float64(s.missedTxCount-s.reportedMissedTxCount) / float64(s.txCount-s.reportedTxCount) * 1000
+	s.reportedTxCount = s.txCount
+	log.Info("RonFi arb missed txs", "shortMissedRate(‰)", missingRate, "totalMissedRate(‰)", float64(s.missedTxCount)/float64(s.txCount)*1000, "missed", s.missedTxCount-s.reportedMissedTxCount, "total", s.missedTxCount)
+	s.reportedMissedTxCount = s.missedTxCount
+
+	prevBalance := s.prevBalance.Load().(defi.RonFiBalance)
+	prevBalance.Eth += charged // adjust here if executors have been charged
+	gross, net := balance.ProfitSince(&prevBalance, 0)
+
+	totalVol := defi.GetDexVolume(s.dexTokensVol)
+	shortVol := totalVol - s.prevTotalVol
+	s.prevTotalVol = totalVol
+
+	log.Info("RonFi arb bot profit: (short)",
+		"gross($)", rcommon.Float2Str(gross, 2),
+		"net($)", rcommon.Float2Str(net, 2),
+		"dexVol(M$)", rcommon.Float2Str(shortVol/1_000_000, 2),
+		"huntingRate(‰)", huntingRate,
+		"txs", txSent,
+		"cancel", s.totalCancel-s.reportedTotalCancel,
+	)
+	s.prevBalance.Store(balance)
+	s.reportedTotalCancel = s.totalCancel
+	huntingRate = float64(totalArbTxs) / float64(s.txCount) * 1000
+	gross, net = balance.ProfitSince(&initialBalance, 0)
+	log.Info("RonFi arb bot profit: (total)",
+		"gross($)", rcommon.Float2Str(gross, 2),
+		"net($)", rcommon.Float2Str(net, 2),
+		"dexVol(M$)", rcommon.Float2Str(totalVol/1_000_000, 2),
+		"huntingRate(‰)", huntingRate,
+		"txs", totalArbTxs,
+		"cancel", s.totalCancel,
 		"runtime", mclock.Since(s.startTime),
 	)
 }
