@@ -30,20 +30,7 @@ func Flashbot(flashRpc *flashbotsrpc.BuilderBroadcastRPC, block *types.Block, cu
 
 	expectedBlock := currentBlock + 1
 
-	// simulate
-	//flashBotRpc := flashbotsrpc.NewFlashbotsRPC("https://relay.flashbots.net")
-	//
-	//callBundleArgs := flashbotsrpc.FlashbotsCallBundleParam{
-	//	Txs:              []string{dexTxHex, arbTxHex},
-	//	BlockNumber:      fmt.Sprintf("0x%x", expectedBlock),
-	//	StateBlockNumber: "latest",
-	//}
-	//result, err := flashBotRpc.FlashbotsCallBundle(privateKey, callBundleArgs)
-	//if err != nil {
-	//	log.Warn("RonFi Falshbot call failed", "err", err)
-	//} else {
-	//	log.Info("RonFi Flashbot", "response", result)
-	//}
+	simulateFlashbotBundle(dexTxHex, arbTxHex, expectedBlock)
 
 	sendBundleArgs := flashbotsrpc.FlashbotsSendBundleRequest{
 		Txs:         []string{dexTxHex, arbTxHex},
@@ -57,5 +44,22 @@ func Flashbot(flashRpc *flashbotsrpc.BuilderBroadcastRPC, block *types.Block, cu
 		} else {
 			log.Info("RonFi Flashbot", "response", result.BundleResponse.BundleHash)
 		}
+	}
+}
+
+func simulateFlashbotBundle(dexTxHex, arbTxHex string, expectedBlock uint64) {
+	// simulate
+	flashBotRpc := flashbotsrpc.NewFlashbotsRPC("https://relay.flashbots.net")
+
+	callBundleArgs := flashbotsrpc.FlashbotsCallBundleParam{
+		Txs:              []string{dexTxHex, arbTxHex},
+		BlockNumber:      fmt.Sprintf("0x%x", expectedBlock),
+		StateBlockNumber: "latest",
+	}
+	result, err := flashBotRpc.FlashbotsCallBundle(privateKey, callBundleArgs)
+	if err != nil {
+		log.Warn("RonFi Falshbot call failed", "err", err)
+	} else {
+		log.Info("RonFi Flashbot", "response", result)
 	}
 }
