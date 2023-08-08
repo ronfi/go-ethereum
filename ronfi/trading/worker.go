@@ -541,7 +541,7 @@ func (w *Worker) workLoop() {
 					} else {
 						baseFee = feeHis.BaseFee[0]
 					}
-					w.gasPrice = new(big.Int).Mul(baseFee, big.NewInt(2))
+					w.gasPrice = new(big.Int).Add(baseFee, new(big.Int).Div(new(big.Int).Mul(baseFee, big.NewInt(2)), big.NewInt(10)))
 				}
 
 			case <-reportTimer.C:
