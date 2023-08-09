@@ -404,45 +404,17 @@ func (lpCycle *LPCycle) AutoUpdate(v3States map[common.Address]*v3.PoolState) bo
 			v2Pool := pool.(*v2.Pool)
 			//addr = v2Pool.Address
 			updated = v2Pool.UpdateReserves()
-			//if updated {
-			//	lpCycle.shareAmounts.V2PoolsIOLock.Lock()
-			//	v2AmountIO, ok := lpCycle.shareAmounts.V2PoolsAmountIOmap[addr]
-			//	if ok && v2AmountIO != nil {
-			//		if v2AmountIO.Reserve0.Cmp(v2Pool.State.Reserve0) != 0 {
-			//			v2AmountIO.Reserve0 = v2Pool.State.Reserve0
-			//			v2AmountIO.AmountIOmap = make(map[string]*big.Int)
-			//		}
-			//	} else {
-			//		amountIOmap := make(map[string]*big.Int)
-			//		lpCycle.shareAmounts.V2PoolsAmountIOmap[addr] = &V2AmountsIO{
-			//			Reserve0:    v2Pool.State.Reserve0,
-			//			AmountIOmap: amountIOmap,
-			//		}
-			//	}
-			//	lpCycle.shareAmounts.V2PoolsIOLock.Unlock()
-			//}
+			if !updated {
+				log.Warn("v2Pool.UpdateReserves() failed!", "pair", v2Pool.Address)
+			}
 		case *v3.Pool:
 			v3Pool := pool.(*v3.Pool)
 			//addr = v3Pool.Address
 			v3State, _ := v3States[v3Pool.Address]
 			updated = v3Pool.UpdatePoolState(v3State)
-			//if updated {
-			//	lpCycle.shareAmounts.V3PoolsIOLock.Lock()
-			//	v3AmountIO, ok := lpCycle.shareAmounts.V3PoolsAmountIOmap[addr]
-			//	if ok && v3AmountIO != nil {
-			//		if v3AmountIO.Liquidity.Cmp(v3Pool.State.Liquidity) != 0 {
-			//			v3AmountIO.Liquidity = v3Pool.State.Liquidity
-			//			v3AmountIO.AmountIOmap = make(map[string]*v3.DetailOut)
-			//		}
-			//	} else {
-			//		amountIOmap := make(map[string]*v3.DetailOut)
-			//		lpCycle.shareAmounts.V3PoolsAmountIOmap[addr] = &V3AmountsIO{
-			//			Liquidity:   v3Pool.State.Liquidity,
-			//			AmountIOmap: amountIOmap,
-			//		}
-			//	}
-			//	lpCycle.shareAmounts.V3PoolsIOLock.Unlock()
-			//}
+			if !updated {
+				log.Warn("v3Pool.UpdatePoolState() failed!", "pool", v3Pool.Address)
+			}
 		}
 
 		if !updated {

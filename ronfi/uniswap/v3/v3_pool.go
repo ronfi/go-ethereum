@@ -228,15 +228,27 @@ func (p *Pool) UpdatePoolState(v3States *PoolState) bool {
 	} else {
 		p.PoolInfo = p.di.GetPoolInfo(p.Address)
 		if p.statedb != nil {
-			liquidity := new(big.Int).SetBytes(p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(5))).Bytes())
-			if liquidity.BitLen() == 0 {
-				//log.Warn("updatePoolState: liquidity is 0", "pool", p.Address.HexNoChecksum())
-				return false
+			// liquidity slot is 4 for uniswap, 5 for pancake
+			slotIndex := uint64(4)
+			if p.PoolInfo.Factory == common.HexToAddress("0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865") {
+				slotIndex = 5
 			}
+			liquidityBytes := p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(slotIndex))).Bytes()
+			liquidity := new(big.Int).SetBytes(liquidityBytes)
+			// we shouldn't return false here, because liquidity == 0 only means no liquidity in current tick
+			//if liquidity.BitLen() == 0 {
+			//	log.Warn("updatePoolState: liquidity is 0",
+			//		"pool", p.Address,
+			//		"factory", p.PoolInfo.Factory,
+			//		"liquidityBytes", fmt.Sprintf("%x", liquidityBytes),
+			//		"liquidity", liquidity,
+			//	)
+			//	return false
+			//}
 
 			slot0Hash := p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(0)))
 			if slot0Hash == (common.Hash{}) {
-				//log.Warn("updatePoolState: slot0Hash is 0", "pool", p.Address.HexNoChecksum())
+				log.Warn("updatePoolState: slot0Hash is 0", "pool", p.Address)
 				return false
 			}
 			slot0 := slot0Hash.Bytes()

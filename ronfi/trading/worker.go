@@ -719,7 +719,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 			}
 
 			if !lpCycle.AutoUpdate(v3States) {
-				//log.Info("RonFi huntingV3TxEvent, lpCycle.AutoUpdate fail", "idx", idx, "loopId", arb.LoopId, "tx", tx.Hash().String(), "pair", pairInfo.Address)
+				log.Info("RonFi huntingV3TxEvent, lpCycle.AutoUpdate fail", "idx", i, "loopId", arb.String(), "tx", tx.Hash().String(), "pair", info.Address)
 				continue
 			}
 
@@ -759,7 +759,10 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 					"amountIn", res.SwapAmount,
 					"grossProfitInUsd", profitDetail.grossProfitInUsd,
 					"txFeeInUsd", profitDetail.txFeeInUsd,
-					"netProfitInUsd", profitDetail.netProfitInUsd)
+					"netProfitInUsd", profitDetail.netProfitInUsd,
+					"gasPrice", w.gasPrice,
+					"gasUsed", profit.Cycle.SumGasNeed,
+				)
 			}
 		}
 
