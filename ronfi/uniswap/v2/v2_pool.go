@@ -65,30 +65,35 @@ func NewV2Pool(di *defi.Info, address common.Address, fee uint64, statedb *state
 	return v2Pool
 }
 
-func (p *Pool) UpdateReserves() bool {
-	if p.PairInfo != nil {
-		if p.PairInfo.Index != 0xFF && p.statedb != nil {
-			res := p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(p.PairInfo.Index)))
-			reserve0 := new(big.Int).SetBytes(res[18:32])
-			reserve1 := new(big.Int).SetBytes(res[4:18])
-			stamp := binary.BigEndian.Uint32(res[0:4])
+func (p *Pool) UpdateReserves(v2State *PoolState) bool {
+	if v2State != nil {
+		p.State = v2State
+		return true
+	} else {
+		if p.PairInfo != nil {
+			if p.PairInfo.Index != 0xFF && p.statedb != nil {
+				res := p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(p.PairInfo.Index)))
+				reserve0 := new(big.Int).SetBytes(res[18:32])
+				reserve1 := new(big.Int).SetBytes(res[4:18])
+				stamp := binary.BigEndian.Uint32(res[0:4])
 
-			p.State = &PoolState{
-				Reserve0: reserve0,
-				Reserve1: reserve1,
-				Stamp:    stamp,
-			}
-
-			return true
-		} else {
-			if res := p.di.GetPairReserves(p.Address); res != nil {
 				p.State = &PoolState{
-					Reserve0: res.Reserve0,
-					Reserve1: res.Reserve1,
-					Stamp:    res.Timestamp,
+					Reserve0: reserve0,
+					Reserve1: reserve1,
+					Stamp:    stamp,
 				}
 
 				return true
+			} else {
+				if res := p.di.GetPairReserves(p.Address); res != nil {
+					p.State = &PoolState{
+						Reserve0: res.Reserve0,
+						Reserve1: res.Reserve1,
+						Stamp:    res.Timestamp,
+					}
+
+					return true
+				}
 			}
 		}
 	}

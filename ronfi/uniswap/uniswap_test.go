@@ -102,8 +102,9 @@ func TestUniswap_CycleSwap(t *testing.T) {
 		},
 	)
 
+	v2States := make(map[common.Address]*v2.PoolState)
 	v3States := make(map[common.Address]*v3.PoolState)
-	arb.AutoUpdate(v3States)
+	arb.AutoUpdate(v2States, v3States)
 	res := arb.CalculateArbitrage()
 	if res != nil {
 		fmt.Println("profitable: ", res.Profitable, "SwapAmount: ", res.SwapAmount, "BestProfit: ", res.BestProfit)
@@ -175,8 +176,9 @@ func TestUniswap_CalculateMaxInAmount(t *testing.T) {
 		},
 	)
 
+	v2States := make(map[common.Address]*v2.PoolState)
 	v3States := make(map[common.Address]*v3.PoolState)
-	arb.AutoUpdate(v3States)
+	arb.AutoUpdate(v2States, v3States)
 	maxIn := arb.CalculateMaxInAmount(common2.StrToBigInt("1000000000000000000"), 0)
 	t.Logf("maxIn: %v\n", maxIn)
 }

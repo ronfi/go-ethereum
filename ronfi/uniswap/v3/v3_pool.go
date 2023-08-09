@@ -212,19 +212,15 @@ func (p *Pool) getTickData(populatedTick int) *TickData {
 	}
 }
 
-func (p *Pool) UpdatePoolState(v3States *PoolState) bool {
-	if v3States != nil {
+func (p *Pool) UpdatePoolState(v3State *PoolState) bool {
+	if v3State != nil {
 		// compare new 'liquidity' with 'old' one, reset maps if not same
 		if p.State == nil {
 			p.tickData = make(map[int]*TickData)
 			p.tickBitMap = make(map[int16]*big.Int)
 		}
 
-		p.State = &PoolState{
-			Tick:         v3States.Tick,
-			SqrtPriceX96: v3States.SqrtPriceX96,
-			Liquidity:    v3States.Liquidity,
-		}
+		p.State = v3State
 	} else {
 		p.PoolInfo = p.di.GetPoolInfo(p.Address)
 		if p.statedb != nil {
@@ -235,6 +231,7 @@ func (p *Pool) UpdatePoolState(v3States *PoolState) bool {
 			}
 			liquidityBytes := p.statedb.GetState(p.Address, common.BigToHash(new(big.Int).SetUint64(slotIndex))).Bytes()
 			liquidity := new(big.Int).SetBytes(liquidityBytes)
+			log.Info("updatePoolState: liquidity", "pool", p.Address, "liquidity", liquidity)
 			// we shouldn't return false here, because liquidity == 0 only means no liquidity in current tick
 			//if liquidity.BitLen() == 0 {
 			//	log.Warn("updatePoolState: liquidity is 0",

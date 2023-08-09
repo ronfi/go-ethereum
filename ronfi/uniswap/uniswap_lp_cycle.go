@@ -394,7 +394,7 @@ func (lpCycle *LPCycle) Dump() {
 	}
 }
 
-func (lpCycle *LPCycle) AutoUpdate(v3States map[common.Address]*v3.PoolState) bool {
+func (lpCycle *LPCycle) AutoUpdate(v2States map[common.Address]*v2.PoolState, v3States map[common.Address]*v3.PoolState) bool {
 	//var addr common.Address
 	for _, pool := range lpCycle.pools {
 		updated := false
@@ -402,14 +402,13 @@ func (lpCycle *LPCycle) AutoUpdate(v3States map[common.Address]*v3.PoolState) bo
 		switch pool.(type) {
 		case *v2.Pool:
 			v2Pool := pool.(*v2.Pool)
-			//addr = v2Pool.Address
-			updated = v2Pool.UpdateReserves()
+			v2State, _ := v2States[v2Pool.Address]
+			updated = v2Pool.UpdateReserves(v2State)
 			if !updated {
 				log.Warn("v2Pool.UpdateReserves() failed!", "pair", v2Pool.Address)
 			}
 		case *v3.Pool:
 			v3Pool := pool.(*v3.Pool)
-			//addr = v3Pool.Address
 			v3State, _ := v3States[v3Pool.Address]
 			updated = v3Pool.UpdatePoolState(v3State)
 			if !updated {

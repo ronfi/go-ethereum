@@ -692,10 +692,27 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
 	v3States := make(map[common.Address]*v3.PoolState)
+	v2States := make(map[common.Address]*v2.PoolState)
 	v2Pools := make(map[common.Address]*v2.Pool)
 	v3Pools := make(map[common.Address]*v3.Pool)
 	v2AmountIOs := make(map[common.Address]map[string]*big.Int)
 	v3AmountIOs := make(map[common.Address]map[string]*v3.DetailOut)
+
+	// update v2/v3 states from target dexTx
+	for _, info := range pairsInfo {
+		if !info.V3 {
+			v2States[info.Address] = &v2.PoolState{
+				Reserve0: info.Reserve0,
+				Reserve1: info.Reserve1,
+			}
+		} else {
+			v3States[info.Address] = &v3.PoolState{
+				Tick:         info.Tick,
+				SqrtPriceX96: info.SqrtPriceX96,
+				Liquidity:    info.Liquidity,
+			}
+		}
+	}
 
 	for i, info := range pairsInfo {
 		edge := uniswap.ToV3Edge(info)
@@ -718,7 +735,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 				continue
 			}
 
-			if !lpCycle.AutoUpdate(v3States) {
+			if !lpCycle.AutoUpdate(v2States, v3States) {
 				log.Info("RonFi huntingV3TxEvent, lpCycle.AutoUpdate fail", "idx", i, "loopId", arb.String(), "tx", tx.Hash().String(), "pair", info.Address)
 				continue
 			}
