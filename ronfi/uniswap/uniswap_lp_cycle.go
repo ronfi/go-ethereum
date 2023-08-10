@@ -69,8 +69,8 @@ func (path V3ArbPath) SumGasNeed() uint64 {
 		sum += gasNeed
 	}
 
-	// add a 300K gas buffer
-	sum += 300000
+	// add a 100K gas buffer
+	sum += 100000
 	return sum
 }
 
@@ -78,28 +78,18 @@ func FromAddress(
 	di *defi.Info,
 	tx *types.Transaction,
 	statedb *state.StateDB,
-	v2AmountIOs map[common.Address]map[string]*big.Int,
-	v3AmountIOs map[common.Address]map[string]*v3.DetailOut,
-	v2Pools map[common.Address]*v2.Pool,
-	v3Pools map[common.Address]*v3.Pool,
 	targetToken common.Address,
 	targetPool *defi.SwapPairInfo,
 	swapPoolAddrs V3ArbPath) *LPCycle {
 	swapPools := make([]interface{}, 0, len(swapPoolAddrs))
 	tokenFees := make([]int, 0, len(swapPoolAddrs))
 	for _, pool := range swapPoolAddrs {
-		var ok bool
 		if pool.PoolType == V2 {
-			var v2Pool *v2.Pool
-			v2Pool, ok = v2Pools[pool.PoolAddr]
-			if !ok {
-				var stateCopy *state.StateDB
-				if statedb != nil {
-					stateCopy = statedb.Copy()
-				}
-				v2Pool = v2.NewV2Pool(di, pool.PoolAddr, uint64(pool.PoolFee), stateCopy)
-				v2Pools[pool.PoolAddr] = v2Pool
+			var stateCopy *state.StateDB
+			if statedb != nil {
+				stateCopy = statedb.Copy()
 			}
+			v2Pool := v2.NewV2Pool(di, pool.PoolAddr, uint64(pool.PoolFee), stateCopy)
 
 			if v2Pool == nil {
 				return nil
@@ -107,16 +97,11 @@ func FromAddress(
 
 			swapPools = append(swapPools, v2Pool)
 		} else if pool.PoolType == V3 {
-			var v3Pool *v3.Pool
-			v3Pool, ok = v3Pools[pool.PoolAddr]
-			if !ok {
-				var stateCopy *state.StateDB
-				if statedb != nil {
-					stateCopy = statedb.Copy()
-				}
-				v3Pool = v3.NewV3Pool(di, tx, pool.PoolAddr, pool.TickLens, stateCopy)
-				v3Pools[pool.PoolAddr] = v3Pool
+			var stateCopy *state.StateDB
+			if statedb != nil {
+				stateCopy = statedb.Copy()
 			}
+			v3Pool := v3.NewV3Pool(di, tx, pool.PoolAddr, pool.TickLens, stateCopy)
 
 			if v3Pool == nil {
 				return nil
@@ -131,7 +116,7 @@ func FromAddress(
 	inputTokenDecimals := tokenInfo.Decimals
 	inputTokenSymbol := tokenInfo.Symbol
 
-	return NewUniswapLPCycle(di, tx, targetToken, targetPool, v2AmountIOs, v3AmountIOs, swapPools, tokenFees, inputTokenDecimals, inputTokenSymbol, swapPoolAddrs.SumGasNeed())
+	return NewUniswapLPCycle(di, tx, targetToken, targetPool, swapPools, tokenFees, inputTokenDecimals, inputTokenSymbol, swapPoolAddrs.SumGasNeed())
 }
 
 type LPCycle struct {
@@ -148,9 +133,7 @@ type LPCycle struct {
 	PoolAddresses      []common.Address
 	PoolTokens         []*TokensPair
 	SwapVectors        []*SwapVector
-	pools              []interface{}
-	v2AmountIOs        map[common.Address]map[string]*big.Int
-	v3AmountIOs        map[common.Address]map[string]*v3.DetailOut
+	Pools              []interface{}
 	best               *BestState
 }
 
@@ -225,8 +208,6 @@ func NewUniswapLPCycle(
 	tx *types.Transaction,
 	inputToken common.Address,
 	targetPool *defi.SwapPairInfo,
-	v2AmountIOs map[common.Address]map[string]*big.Int,
-	v3AmountIOs map[common.Address]map[string]*v3.DetailOut,
 	pools []interface{},
 	tokenFees []int,
 	inputTokenDecimals uint64,
@@ -240,9 +221,7 @@ func NewUniswapLPCycle(
 		InputTokenSymbol:   inputTokenSymbol,
 		TargetPool:         targetPool,
 		SumGasNeed:         sumGasNeed,
-		pools:              pools,
-		v2AmountIOs:        v2AmountIOs,
-		v3AmountIOs:        v3AmountIOs,
+		Pools:              pools,
 	}
 
 	poolAddresses := make([]common.Address, 0, len(pools))
@@ -385,7 +364,7 @@ func NewUniswapLPCycle(
 }
 
 func (lpCycle *LPCycle) Dump() {
-	for _, pool := range lpCycle.pools {
+	for _, pool := range lpCycle.Pools {
 		switch pool.(type) {
 		case *v3.Pool:
 			v3Pool := pool.(*v3.Pool)
@@ -396,7 +375,7 @@ func (lpCycle *LPCycle) Dump() {
 
 func (lpCycle *LPCycle) AutoUpdate(v2States map[common.Address]*v2.PoolState, v3States map[common.Address]*v3.PoolState) bool {
 	//var addr common.Address
-	for _, pool := range lpCycle.pools {
+	for _, pool := range lpCycle.Pools {
 		updated := false
 
 		switch pool.(type) {
@@ -439,7 +418,7 @@ type V3AmountOut struct {
 }
 
 func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
-	for i, pool := range lpCycle.pools {
+	for i, pool := range lpCycle.Pools {
 		switch pool.(type) {
 		case *v2.Pool:
 			v2Pool := pool.(*v2.Pool)
@@ -466,105 +445,36 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 		maxIn := big.NewInt(0)
 		cycle := c.(*LPCycle)
 
-		amountIns := make([]*big.Int, 0, len(cycle.pools))
-		amountOuts := make([]*big.Int, 0, len(cycle.pools))
+		amountIns := make([]*big.Int, 0, len(cycle.Pools))
+		amountOuts := make([]*big.Int, 0, len(cycle.Pools))
 		if x == nil || x.BitLen() == 0 {
 			return nil, nil, amountIns, amountOuts
 		}
 
 		amountIn := new(big.Int).Set(x)
 		var (
-			amountOut         *big.Int
-			amountInRemaining *big.Int
-			profit            *big.Int
+			amountOut *big.Int
+			profit    *big.Int
 		)
-		for i, pool := range cycle.pools {
-			poolAddress := cycle.PoolAddresses[i]
+		for i, pool := range cycle.Pools {
 			tokenIn := cycle.SwapVectors[i].TokenIn
-			tokenOut := cycle.SwapVectors[i].TokenOut
 			isV3Pool := false
 			switch pool.(type) {
 			case *v2.Pool:
 				v2Pool := pool.(*v2.Pool)
-				// check v2PoolsAmountIOmap firstly, directly take the value if having
-				reuseOK := false
-				isNewMap := true
-				dir := 0
-				if tokenIn == v2Pool.PairInfo.Token1 {
-					dir = 1
-				}
-				amountIO, ok := cycle.v2AmountIOs[poolAddress]
-				if ok {
-					isNewMap = false
-					key := fmt.Sprintf("%d-%s", dir, amountIn.String())
-					exist := false
-					if amountOut, exist = amountIO[key]; exist {
-						reuseOK = true
-					}
-				}
-
-				if !reuseOK {
-					amountOut = v2Pool.CalculateTokensOutFromTokensIn(tokenIn, amountIn)
-					if isNewMap {
-						amountIO := make(map[string]*big.Int)
-						cycle.v2AmountIOs[poolAddress] = amountIO
-					}
-
-					// save this calculation into map
-					key := fmt.Sprintf("%d-%s", dir, amountIn.String())
-					cycle.v2AmountIOs[poolAddress][key] = amountOut
-				}
+				amountOut = v2Pool.CalculateTokensOutFromTokensIn(tokenIn, amountIn)
 
 			case *v3.Pool:
 				isV3Pool = true
 				v3Pool := pool.(*v3.Pool)
-				// check v3PoolsAmountIOmap firstly, directly take the value if having
-				reuseOK := false
-				isNewMap := true
-				dir := 0
-				if tokenIn == v3Pool.PoolInfo.Token1 {
-					dir = 1
-				}
-				amountIO, ok := cycle.v3AmountIOs[poolAddress]
-				if ok {
-					isNewMap = false
-					key := fmt.Sprintf("%d-%s", dir, amountIn.String())
-					if out, exist := amountIO[key]; exist {
-						reuseOK = true
-						amountOut = out.AmountOut
-						amountInRemaining = out.AmountInRemaining
-					}
-				}
+				amountOut, _ = v3Pool.CalculateTokensOutFromTokensIn(tokenIn, amountIn)
 
-				if !reuseOK {
-					amountOut, amountInRemaining = v3Pool.CalculateTokensOutFromTokensIn(tokenIn, amountIn)
-					detailOut := v3.DetailOut{AmountOut: new(big.Int).Set(amountOut), AmountInRemaining: new(big.Int).Set(amountInRemaining), MaxIn: nil}
-					if isNewMap {
-						amountIOmap := make(map[string]*v3.DetailOut)
-						cycle.v3AmountIOs[poolAddress] = amountIOmap
+				if amountOut == nil || amountOut.BitLen() == 0 {
+					if !isV3Pool {
+						return nil, nil, amountIns, amountOuts
+					} else {
+						return maxIn, nil, amountIns, amountOuts
 					}
-					if amountInRemaining != nil && amountInRemaining.BitLen() != 0 {
-						if i == 0 {
-							maxIn = new(big.Int).Sub(x, amountInRemaining)
-						} else {
-							maxOut := amountOut
-							if maxOut == nil {
-								maxOut = cycle.di.GetTokenBalance(poolAddress, tokenOut)
-							}
-							maxIn = cycle.CalculateMaxInAmount(maxOut, i)
-						}
-					}
-					// save this calculation into map
-					key := fmt.Sprintf("%d-%s", dir, amountIn.String())
-					cycle.v3AmountIOs[poolAddress][key] = &detailOut
-				}
-			}
-
-			if amountOut == nil || amountOut.BitLen() == 0 {
-				if !isV3Pool {
-					return nil, nil, amountIns, amountOuts
-				} else {
-					return maxIn, nil, amountIns, amountOuts
 				}
 			}
 
@@ -632,7 +542,7 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 
 		lpCycle.best.swapAmount = new(big.Int).Set(swapAmount)
 		lpCycle.best.profitAmount = new(big.Int).Set(bestProfit)
-		log.Warn("RonFi CalculateArbitrage succeed", "hops", len(lpCycle.pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "elapsed", mclock.Since(startTime).String())
+		log.Warn("RonFi CalculateArbitrage succeed", "hops", len(lpCycle.Pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "elapsed", mclock.Since(startTime).String())
 
 		return &ProfitAmount{
 			Iters:      iters,
@@ -645,7 +555,7 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 		}
 	} else {
 		elapsed := mclock.Since(startTime)
-		log.Warn("RonFi CalculateArbitrage fail", "hops", len(lpCycle.pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "eps", eps, "elapsed", elapsed.String(), "err", err)
+		log.Warn("RonFi CalculateArbitrage fail", "hops", len(lpCycle.Pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "eps", eps, "elapsed", elapsed.String(), "err", err)
 	}
 
 	return nil
@@ -660,11 +570,11 @@ func (lpCycle *LPCycle) CalculateMaxInAmount(maxAmountOut *big.Int, hops int) (m
 
 	amountIn := big.NewInt(0)
 	balance := big.NewInt(0)
-	if hops > len(lpCycle.pools)-1 {
+	if hops > len(lpCycle.Pools)-1 {
 		return
 	}
 	for i := hops; i >= 0; i-- {
-		pool := lpCycle.pools[i]
+		pool := lpCycle.Pools[i]
 		poolAddress := lpCycle.PoolAddresses[i]
 		swapVector := lpCycle.SwapVectors[i]
 		if pool == nil || swapVector == nil {

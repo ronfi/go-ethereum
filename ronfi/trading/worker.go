@@ -693,10 +693,6 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
 	v3States := make(map[common.Address]*v3.PoolState)
 	v2States := make(map[common.Address]*v2.PoolState)
-	v2Pools := make(map[common.Address]*v2.Pool)
-	v3Pools := make(map[common.Address]*v3.Pool)
-	v2AmountIOs := make(map[common.Address]map[string]*big.Int)
-	v3AmountIOs := make(map[common.Address]map[string]*v3.DetailOut)
 
 	// update v2/v3 states from target dexTx
 	for _, info := range pairsInfo {
@@ -729,7 +725,7 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 		}
 		profits := make(ProfitDetails, 0, len(arbs))
 		for _, arb := range arbs {
-			lpCycle := uniswap.FromAddress(w.di, tx, appState, v2AmountIOs, v3AmountIOs, v2Pools, v3Pools, arb[0].TokenIn, info, arb)
+			lpCycle := uniswap.FromAddress(w.di, tx, appState, arb[0].TokenIn, info, arb)
 			if lpCycle == nil {
 				log.Warn("RonFi huntingTxEvent: uniswap.FromAddress fail", "idx", i, "loopId", arb.String(), "tx", tx.Hash().String(), "pair", info.Address)
 				continue
@@ -749,6 +745,31 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 				price := defi.GetTradingTokenPrice(profit.Cycle.InputToken)
 				profitInToken := rcommon.EthBigInt2Float64(profit.Profit.BestProfit)
 				grossProfitInUsd := profitInToken / price * defi.GetTradingTokenPrice(rcommon.USDC)
+
+				if grossProfitInUsd > 1000.0 {
+					for _, pool := range lpCycle.Pools {
+						switch pool.(type) {
+						case *v2.Pool:
+							v2Pool := pool.(*v2.Pool)
+							log.Info("RonFi huntingTxEvent big profit, v2Pool",
+								"idx", i, "loopId", arb.String(),
+								"tx", tx.Hash().String(),
+								"pair", v2Pool.Address,
+								"reserve0", v2Pool.State.Reserve0,
+								"reserve1", v2Pool.State.Reserve1)
+						case *v3.Pool:
+							v3Pool := pool.(*v3.Pool)
+							log.Info("RonFi huntingTxEvent big profit, v3Pool",
+								"idx", i,
+								"loopId", arb.String(),
+								"tx", tx.Hash().String(),
+								"pool", v3Pool.Address,
+								"tick", v3Pool.State.Tick,
+								"sqrtPriceX96", v3Pool.State.SqrtPriceX96,
+								"liquidity", v3Pool.State.Liquidity)
+						}
+					}
+				}
 
 				txFeeInBnb := rcommon.EthBigInt2Float64(new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
 				txFeeInUsd := txFeeInBnb * defi.GetTradingTokenPrice(rcommon.USDC)

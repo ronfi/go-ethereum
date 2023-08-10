@@ -67,6 +67,8 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 	//}
 
 	options.GasPrice = w.gasPrice
+	gasFeeCap := big.NewInt(0).Mul(w.gasPrice, big.NewInt(2))
+	options.GasFeeCap = gasFeeCap
 	options.NoSend = true //only return signedTx
 
 	path := make([]common.Address, 0, len(bestProfit.Cycle.PoolAddresses)*2)

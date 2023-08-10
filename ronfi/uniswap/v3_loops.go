@@ -219,6 +219,10 @@ func NewV3Loops(
 	totalStaledV3Pools := 0
 	g := NewGraph()
 	for addr, info := range pairsInfo {
+		if _, ok := blackPairsList[addr]; ok {
+			continue
+		}
+
 		if isStaledPools(di, addr, info.Token0, info.Token1) {
 			totalStaledV2Pairs++
 			//log.Info("RonFi V3Loops", "skip staled pair", addr)
@@ -271,6 +275,10 @@ func NewV3Loops(
 	}
 
 	for addr, info := range poolsInfo {
+		if _, ok := blackPairsList[addr]; ok {
+			continue
+		}
+
 		if isStaledPools(di, addr, info.Token0, info.Token1) {
 			totalStaledV3Pools++
 			//log.Info("RonFi V3Loops", "skip staled pool", addr)
@@ -318,7 +326,7 @@ func NewV3Loops(
 		g.AddEdge(edge)
 		g.AddEdge(reversedEdge)
 	}
-	log.Info("RonFi V3Loops", "total staled v2 pairs", totalStaledV2Pairs, "total staled v3 pools", totalStaledV3Pools)
+	log.Info("RonFi V3Loops", "total staled v2 pairs", totalStaledV2Pairs, "total staled v3 Pools", totalStaledV3Pools)
 
 	return &V3Loops{
 		di:         di,

@@ -72,18 +72,10 @@ func TestUniswap_CycleSwap(t *testing.T) {
 		t.Fatalf("TestV3_Swap NewInfo failed!")
 	}
 
-	v2AmountIOs := make(map[common.Address]map[string]*big.Int)
-	v3AmountIOs := make(map[common.Address]map[string]*v3.DetailOut)
-	v2Pools := make(map[common.Address]*v2.Pool)
-	v3Pools := make(map[common.Address]*v3.Pool)
 	arb := FromAddress(
 		di,
 		nil,
 		nil,
-		v2AmountIOs,
-		v3AmountIOs,
-		v2Pools,
-		v3Pools,
 		common.HexToAddress("0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"),
 		nil,
 		[]*Pool{
@@ -146,18 +138,10 @@ func TestUniswap_CalculateMaxInAmount(t *testing.T) {
 		t.Fatalf("TestUniswap_CalculateMaxInAmount NewInfo failed!")
 	}
 
-	v2AmountIOs := make(map[common.Address]map[string]*big.Int)
-	v3AmountIOs := make(map[common.Address]map[string]*v3.DetailOut)
-	v2Pools := make(map[common.Address]*v2.Pool)
-	v3Pools := make(map[common.Address]*v3.Pool)
 	arb := FromAddress(
 		di,
 		nil,
 		nil,
-		v2AmountIOs,
-		v3AmountIOs,
-		v2Pools,
-		v3Pools,
 		common.HexToAddress("0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"),
 		nil,
 		[]*Pool{
