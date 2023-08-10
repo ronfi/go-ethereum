@@ -1,6 +1,7 @@
 package trading
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -52,24 +53,19 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 
 	options.Value = big.NewInt(0)
 	options.GasLimit = gasLimit
-	//if tx.GasPrice().Cmp(GasPriceMaxAllowed) >= 0 {
-	//	options.GasPrice = GasPriceMinAllowedBusy
-	//	w.ReportSkipReason(tx, SkipReasonGasPriceHigh, "")
-	//} else {
-	//	options.GasPrice = tx.GasPrice()
-	//}
-
-	//var baseFee *big.Int
-	//if feeHis, err := w.client.FeeHistory(context.Background(), 1, new(big.Int).SetUint64(w.currentBlockNum), nil); err != nil {
-	//	log.Warn("RonFi swap transaction, FeeHistory failed, err=%s", err)
-	//} else {
-	//	baseFee = feeHis.BaseFee[0]
-	//}
-
-	options.GasPrice = w.gasPrice
-	gasFeeCap := big.NewInt(0).Mul(w.gasPrice, big.NewInt(2))
-	options.GasFeeCap = gasFeeCap
 	options.NoSend = true //only return signedTx
+
+	if gasTipCap, err := w.client.SuggestGasTipCap(context.Background()); err != nil {
+		log.Warn("RonFi DexSwapHunting, get SuggestGasTipCap failed!", "err", err)
+		return false, nil
+	} else {
+		options.GasTipCap = gasTipCap
+
+		// max_fee = base_fee * 2
+		gasFeeCap := big.NewInt(0).Mul(w.gasPrice, big.NewInt(2))
+		gasFeeCap = gasFeeCap.Add(gasFeeCap, gasTipCap)
+		options.GasFeeCap = gasFeeCap
+	}
 
 	path := make([]common.Address, 0, len(bestProfit.Cycle.PoolAddresses)*2)
 	dirs := make([]uint8, 0, len(bestProfit.Cycle.PoolAddresses))
