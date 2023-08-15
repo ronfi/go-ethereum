@@ -40,7 +40,7 @@ func NewRonSandwich(worker *Worker, executorPrivKey *ecdsa.PrivateKey, executorA
 	for _, info := range pairsInfo {
 		// only keep pair/pool whose tokenIn is WETH
 		if info.TokenIn != rcommon.WETH {
-			log.Warn("RonFi Sandwich NewRonSandwich invalid pair", "pair", info.Address)
+			//log.Warn("RonFi Sandwich NewRonSandwich invalid pair", "tx", targetTx.Hash(), "pair", info.Address)
 			continue
 		}
 	}
@@ -61,6 +61,8 @@ func (s *RonSandwich) Build() []*types.Transaction {
 		amountIn := s.optimalWethIn(pool)
 		if amountIn != nil && amountIn.Cmp(big.NewInt(0)) > 0 {
 			log.Info("RonFi Sandwich optimalWethIn", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn)
+		} else {
+			log.Warn("RonFi Sandwich optimalWethIn failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
 		}
 	}
 
