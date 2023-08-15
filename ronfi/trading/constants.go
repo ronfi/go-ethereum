@@ -21,6 +21,7 @@ var (
 	GasPriceMinAllowedBusy = big.NewInt(0).Mul(big.NewInt(5_010_000_000), big.NewInt(params.Wei)) // 5.01 Gwei is the minimum required price in case the whole blockchain is busy
 	GasPriceMaxAllowedCopy = big.NewInt(0).Mul(big.NewInt(50), big.NewInt(params.GWei))           // 10 Gwei is the maximum allowed price for arb tx copy
 
+	GasLimitOneHop  = uint64(200000)
 	GasLimitDefault = uint64(500000)
 
 	falshbotURLs = []string{

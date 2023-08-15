@@ -193,3 +193,17 @@ func IsValidFactory(factory common.Address) bool {
 
 	return ok
 }
+
+func GetV3TickLens(factory common.Address) common.Address {
+	tickLens := ZeroAddress
+	switch factory {
+	case UniswapV3FacotryAddress:
+		tickLens = UniswapV3TicklensAddress
+	case SushiSwapV3FactoryAddress:
+		tickLens = SushiSwapV3TickLensAddress
+	case PancakeSwapV3FactoryAddress:
+		tickLens = PancakeSwapV3TickLensAddress
+	}
+
+	return tickLens
+}

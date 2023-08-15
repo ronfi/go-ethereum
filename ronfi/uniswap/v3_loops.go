@@ -395,12 +395,28 @@ func (v *V3Loops) FindLoops(edge *Edge) []V3ArbPath {
 					GasNeed:  edge.Tag.GasNeed,
 				})
 			} else if edge.Tag.PoolType == V3 {
+				tickLens := rcommon.ZeroAddress
+				poolInfo := v.poolsInfo[edge.Tag.Pair]
+				if poolInfo == nil {
+					log.Info("RonFi V3Loops", "unKnown v3 pool", edge.Tag.Pair)
+					validCycle = false
+					break
+				} else {
+					tickLens = rcommon.GetV3TickLens(poolInfo.Factory)
+				}
+
+				if tickLens == rcommon.ZeroAddress {
+					log.Info("RonFi V3Loops", "unKnown v3 pool tickLens", edge.Tag.Pair)
+					validCycle = false
+					break
+				}
+
 				path = append(path, &Pool{
 					PoolAddr: edge.Tag.Pair,
 					PoolType: V3,
 					PoolFee:  0,
 					TokenFee: tokenFee,
-					TickLens: rcommon.UniswapV3TicklensAddress,
+					TickLens: tickLens,
 					TokenIn:  edge.Source,
 					Dir:      edge.Tag.Dir,
 					GasNeed:  edge.Tag.GasNeed,

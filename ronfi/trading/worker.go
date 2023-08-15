@@ -683,11 +683,27 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 		vlogs := appState.GetLogs(ronfiTxHash, w.currentBlockNum, common.Hash{})
 		swapPairsInfo := w.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
 		if len(swapPairsInfo) > 0 {
-			w.huntingTxEvent(appState, tx, 0, swapPairsInfo, handlerStartTime)
+			//w.huntingTxEvent(appState, tx, 0, swapPairsInfo, handlerStartTime)
+			_, newStatedb := w.stateDbsConsumeOneCopy()
+			if appState == nil {
+				log.Warn("RonFi handlePromotedTx newStatedb is nil")
+			} else {
+				w.sandwichTx(tx, swapPairsInfo, newStatedb)
+			}
 		}
 	}
 
 	return
+}
+
+func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInfo, appState *state.StateDB) {
+	randomExecutorId := tx.Hash().TailUint64()
+	ringId := randomExecutorId % w.totalExecutors
+
+	ronSandWich := NewRonSandwich(w, w.executorPrivKey[ringId], w.executorAddress[ringId], tx, pairsInfo, appState)
+	if ronSandWich == nil {
+		return
+	}
 }
 
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
