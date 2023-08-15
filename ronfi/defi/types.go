@@ -1,6 +1,7 @@
 package defi
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ronfi/db"
@@ -130,4 +131,29 @@ type SwapPairInfo struct {
 	SqrtPriceX96 *big.Int
 	Liquidity    *big.Int
 	Dir          uint64
+}
+
+func (p *SwapPairInfo) Reverse() *SwapPairInfo {
+	dir := 1 - p.Dir
+	key := fmt.Sprintf("%s-%d", p.Address, dir^1)
+
+	return &SwapPairInfo{
+		Address:      p.Address,
+		Key:          key,
+		V3:           p.V3,
+		BothBriToken: p.BothBriToken,
+		Sender:       p.Sender,
+		To:           p.To,
+		TokenIn:      p.TokenOut,
+		TokenOut:     p.TokenIn,
+		KeyToken:     p.KeyToken,
+		AmountIn:     nil,
+		AmountOut:    nil,
+		Reserve0:     nil,
+		Reserve1:     nil,
+		Tick:         p.Tick,
+		SqrtPriceX96: p.SqrtPriceX96,
+		Liquidity:    p.Liquidity,
+		Dir:          dir,
+	}
 }

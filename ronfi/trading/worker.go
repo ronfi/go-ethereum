@@ -704,6 +704,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInf
 	if ronSandWich == nil {
 		return
 	}
+	ronSandWich.Build()
 }
 
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
