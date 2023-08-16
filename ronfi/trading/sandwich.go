@@ -63,92 +63,61 @@ func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
 	for _, pool := range s.pools {
 		if amountIn, ok := s.optimalWethIn(pool); ok && (amountIn != nil && amountIn.Cmp(big.NewInt(0)) > 0) {
 			log.Info("RonFi Sandwich optimalWethIn succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn)
+			// apply transactions to check if it's profitable
+			// apply transaction
+			var (
+				applySuccess, reverted bool
+				err                    string
+			)
+			appState := s.appState.Copy()
 
 			nonce := s.appState.GetNonce(s.execAddress)
-			conTx := s.convertEthToWETH(amountIn, nonce)
-			if conTx == nil {
-				log.Warn("RonFi Sandwich Build convertEthToWETH failed", "pair", pool.Address)
-				return nil, false
+			// convert eth to weth
+			{
+				conTx := s.convertEthToWETH(amountIn, nonce)
+				if conTx == nil {
+					return nil, false
+				}
+
+				applySuccess, reverted, err = s.worker.applyTransaction(conTx, ronFiTxHash(conTx.Hash()), appState)
+				if !applySuccess || reverted {
+					log.Warn("RonFi Sandwich Build applyTransaction convert weth failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+					return nil, false
+				}
 			}
 
 			// transfer weth to v2 pair
-			nonce++
-			transTx := s.transferToken(rcommon.WETH, pool.Address, amountIn, nonce)
-			if transTx == nil {
-				log.Warn("RonFi Sandwich Build transferToken failed", "pair", pool.Address)
-				return nil, false
-			}
-
-			nonce++
-			if frontRunTx, amountOut, ok := s.buildSandWichTx(pool, amountIn, nonce); ok && (frontRunTx != nil && amountOut != nil && amountOut.Cmp(big.NewInt(0)) > 0) {
-				txs = append(txs, frontRunTx)
-				// add target tx
-				txs = append(txs, s.targetTx)
-
-				rPool := pool.Reverse()
-				var transBTx *types.Transaction
-				if !rPool.V3 {
-					// for v2, we should transfer token first
-					nonce++
-					transBTx = s.transferToken(rPool.TokenIn, rPool.Address, amountOut, nonce)
-					if transBTx == nil {
-						log.Warn("RonFi Sandwich Build transferToken before back run failed", "pair", pool.Address)
-						return nil, false
-					}
+			{
+				nonce++
+				transTx := s.transferToken(rcommon.WETH, pool.Address, amountIn, nonce)
+				if transTx == nil {
+					return nil, false
 				}
 
-				// build back run tx
+				applySuccess, reverted, err = s.worker.applyTransaction(transTx, ronFiTxHash(transTx.Hash()), appState)
+				if !applySuccess || reverted {
+					log.Warn("RonFi Sandwich Build applyTransaction transfer token failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "err", err)
+					return nil, false
+				}
+			}
+
+			// front run tx
+			amountBack := big.NewInt(0)
+			{
 				nonce++
-				if backRunTx, _, ok := s.buildSandWichTx(rPool, amountOut, nonce); ok && backRunTx != nil {
-					// apply transactions to check if it's profitable
-					// apply transaction
-					var (
-						applySuccess, reverted bool
-						err                    string
-					)
-					appState := s.appState.Copy()
+				frontRunTx, amountOut, ok := s.buildSandWichTx(pool, amountIn, nonce)
+				if !ok || frontRunTx == nil || amountOut == nil || amountOut.Cmp(big.NewInt(0)) <= 0 {
+					log.Warn("RonFi Sandwich Build create front run tx failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+					return nil, false
+				}
 
-					applySuccess, reverted, err = s.worker.applyTransaction(conTx, ronFiTxHash(conTx.Hash()), appState)
-					if !applySuccess || reverted {
-						log.Warn("RonFi Sandwich Build applyTransaction convert weth failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
-						return nil, false
-					}
-
-					applySuccess, reverted, err = s.worker.applyTransaction(transTx, ronFiTxHash(transTx.Hash()), appState)
-					if !applySuccess || reverted {
-						log.Warn("RonFi Sandwich Build applyTransaction transfer token failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "err", err)
-						return nil, false
-					}
-
-					applySuccess, reverted, err = s.worker.applyTransaction(frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState)
-					if !applySuccess || reverted {
-						log.Warn("RonFi Sandwich Build applyTransaction frontRunTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
-						return txs, false
-					}
-
-					applySuccess, reverted, err = s.worker.applyTransaction(s.targetTx, ronFiTxHash(s.targetTx.Hash()), appState)
-					if !applySuccess || reverted {
-						log.Warn("RonFi Sandwich Build applyTransaction targetTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
-						return txs, false
-					}
-
-					if !rPool.V3 && transBTx != nil {
-						applySuccess, reverted, err = s.worker.applyTransaction(transBTx, ronFiTxHash(transBTx.Hash()), appState)
-						if !applySuccess || reverted {
-							log.Warn("RonFi Sandwich Build applyTransaction transBTx (before back run) failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
-							return txs, false
-						}
-					}
-
-					applySuccess, reverted, err = s.worker.applyTransaction(backRunTx, ronFiTxHash(backRunTx.Hash()), appState)
-					if !applySuccess || reverted {
-						log.Warn("RonFi Sandwich Build applyTransaction backRunTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
-						return txs, false
-					}
-
-					// check if profitable
-					vlogs := appState.GetLogs(ronFiTxHash(backRunTx.Hash()), s.worker.currentBlockNum, common.Hash{})
-					swapPairsInfo := s.worker.di.ExtractSwapPairInfo(s.targetTx, *s.targetTx.To(), vlogs, defi.RonFiExtractTypeHunting)
+				applySuccess, reverted, err = s.worker.applyTransaction(frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState)
+				if !applySuccess || reverted {
+					log.Warn("RonFi Sandwich Build applyTransaction frontRunTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+					return txs, false
+				} else {
+					vlogs := appState.GetLogs(ronFiTxHash(frontRunTx.Hash()), s.worker.currentBlockNum, common.Hash{})
+					swapPairsInfo := s.worker.di.ExtractSwapPairInfo(frontRunTx, *frontRunTx.To(), vlogs, defi.RonFiExtractTypeHunting)
 					if len(swapPairsInfo) > 0 {
 						swapPairInfo := swapPairsInfo[0]
 						bAmountOut := swapPairInfo.AmountOut
@@ -156,22 +125,82 @@ func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
 							log.Warn("RonFi Sandwich Build back run tx ExtractSwapPairInfo amount failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
 							return txs, false
 						} else {
-							if bAmountOut.Cmp(amountIn) > 0 {
-								log.Info("RonFi Sandwich Build profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "profit", new(big.Int).Sub(bAmountOut, amountIn))
-								txs = append(txs, backRunTx)
-								return txs, true
-							} else {
-								log.Warn("RonFi Sandwich Build not profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "bAmountOut", bAmountOut)
-								return txs, false
-							}
+							log.Info("RonFi Sandwich Build frontRun", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", bAmountOut)
+							amountBack = bAmountOut
 						}
 					} else {
-						log.Warn("RonFi Sandwich Build back run tx ExtractSwapPairInfo failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+						log.Warn("RonFi Sandwich Build front run tx ExtractSwapPairInfo failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
 						return txs, false
 					}
 				}
-			} else {
-				log.Warn("RonFi Sandwich Build front run transaction failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+			}
+
+			// target tx
+			{
+				applySuccess, reverted, err = s.worker.applyTransaction(s.targetTx, ronFiTxHash(s.targetTx.Hash()), appState)
+				if !applySuccess || reverted {
+					log.Warn("RonFi Sandwich Build applyTransaction targetTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+					return txs, false
+				}
+			}
+
+			rPool := pool.Reverse()
+			// transfer token back
+			{
+				if !rPool.V3 {
+					// for v2, we should transfer token first
+					nonce++
+					transBTx := s.transferToken(rPool.TokenIn, rPool.Address, amountBack, nonce)
+					if transBTx == nil {
+						return nil, false
+					}
+
+					applySuccess, reverted, err = s.worker.applyTransaction(transBTx, ronFiTxHash(transBTx.Hash()), appState)
+					if !applySuccess || reverted {
+						log.Warn("RonFi Sandwich Build applyTransaction transBTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+						return txs, false
+					}
+				}
+			}
+
+			// back run tx
+			{
+				nonce++
+				backRunTx, _, ok := s.buildSandWichTx(rPool, amountBack, nonce)
+				if !ok || backRunTx == nil {
+					log.Warn("RonFi Sandwich Build create back run tx failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+					return nil, false
+				}
+
+				applySuccess, reverted, err = s.worker.applyTransaction(backRunTx, ronFiTxHash(backRunTx.Hash()), appState)
+				if !applySuccess || reverted {
+					log.Warn("RonFi Sandwich Build applyTransaction backRunTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+					return txs, false
+				}
+
+				// check if profitable
+				vlogs := appState.GetLogs(ronFiTxHash(backRunTx.Hash()), s.worker.currentBlockNum, common.Hash{})
+				swapPairsInfo := s.worker.di.ExtractSwapPairInfo(backRunTx, *backRunTx.To(), vlogs, defi.RonFiExtractTypeHunting)
+				if len(swapPairsInfo) > 0 {
+					swapPairInfo := swapPairsInfo[0]
+					bAmountOut := swapPairInfo.AmountOut
+					if bAmountOut == nil || bAmountOut.Cmp(big.NewInt(0)) <= 0 {
+						log.Warn("RonFi Sandwich Build back run tx ExtractSwapPairInfo amount failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+						return txs, false
+					} else {
+						if bAmountOut.Cmp(amountIn) > 0 {
+							log.Info("RonFi Sandwich Build profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "profit", new(big.Int).Sub(bAmountOut, amountIn))
+							txs = append(txs, backRunTx)
+							return txs, true
+						} else {
+							log.Warn("RonFi Sandwich Build not profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "bAmountOut", bAmountOut)
+							return txs, false
+						}
+					}
+				} else {
+					log.Warn("RonFi Sandwich Build back run tx ExtractSwapPairInfo failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+					return txs, false
+				}
 			}
 		} else {
 			log.Warn("RonFi Sandwich Build optimalWethIn failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
@@ -209,32 +238,32 @@ func (s *RonSandwich) optimalWethIn(pool *defi.SwapPairInfo) (*big.Int, bool) {
 		// apply transaction
 		var (
 			applySuccess, reverted bool
-			err                    string
+			//err                    string
 		)
 
-		applySuccess, reverted, err = s.worker.applyTransaction(conTx, ronFiTxHash(conTx.Hash()), appState)
+		applySuccess, reverted, _ = s.worker.applyTransaction(conTx, ronFiTxHash(conTx.Hash()), appState)
 		if !applySuccess || reverted {
 			//log.Warn("RonFi Sandwich calculateF applyTransaction convert weth failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
 			return nil, false
 		}
 
-		applySuccess, reverted, err = s.worker.applyTransaction(transTx, ronFiTxHash(transTx.Hash()), appState)
+		applySuccess, reverted, _ = s.worker.applyTransaction(transTx, ronFiTxHash(transTx.Hash()), appState)
 		if !applySuccess || reverted {
 			//log.Warn("RonFi Sandwich calculateF applyTransaction transfer token failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "err", err)
 			return nil, false
 		}
 
 		frontRunTxHash := ronFiTxHash(frontRunTx.Hash())
-		applySuccess, reverted, err = s.worker.applyTransaction(frontRunTx, frontRunTxHash, appState)
+		applySuccess, reverted, _ = s.worker.applyTransaction(frontRunTx, frontRunTxHash, appState)
 		if !applySuccess || reverted {
 			//log.Warn("RonFi Sandwich calculateF applyTransaction frontRunTx failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "err", err)
 			return nil, false
 		}
 
 		targetTxHash := ronFiTxHash(s.targetTx.Hash())
-		applySuccess, reverted, err = s.worker.applyTransaction(s.targetTx, targetTxHash, appState)
+		applySuccess, reverted, _ = s.worker.applyTransaction(s.targetTx, targetTxHash, appState)
 		if !applySuccess || reverted {
-			log.Warn("RonFi Sandwich calculateF applyTransaction targetTx failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+			//log.Warn("RonFi Sandwich calculateF applyTransaction targetTx failed", "targetTx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
 			return nil, false
 		}
 
@@ -256,7 +285,7 @@ func (s *RonSandwich) binarySearch(pool *defi.SwapPairInfo, frontRunTx *types.Tr
 		mid := new(big.Int).Add(left, new(big.Int).Div(gap, big.NewInt(2)))
 		if frontRunTx, ok := calculateF(s.appState.Copy(), pool, mid); ok {
 			// Number go up
-			log.Warn("RonFi Sandwich binarySearch calculateF succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", mid)
+			//log.Warn("RonFi Sandwich binarySearch calculateF succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", mid)
 			return s.binarySearch(pool, frontRunTx, mid, calculateF, mid, right, tolerance)
 		} else {
 			// Number go down
