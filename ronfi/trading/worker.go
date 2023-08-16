@@ -688,7 +688,7 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 			if appState == nil {
 				log.Warn("RonFi handlePromotedTx newStatedb is nil")
 			} else {
-				w.sandwichTx(tx, swapPairsInfo, newStatedb)
+				w.sandwichTx(tx, swapPairsInfo, newStatedb, handlerStartTime)
 			}
 		}
 	}
@@ -696,7 +696,7 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 	return
 }
 
-func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInfo, appState *state.StateDB) {
+func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInfo, appState *state.StateDB, handlerStartTime mclock.AbsTime) {
 	randomExecutorId := tx.Hash().TailUint64()
 	ringId := randomExecutorId % w.totalExecutors
 
@@ -705,6 +705,8 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInf
 		return
 	}
 	ronSandWich.Build()
+
+	log.Info("RonFi sandwichTx", "tx", tx.Hash().String(), "elapsed", mclock.Since(handlerStartTime))
 }
 
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
