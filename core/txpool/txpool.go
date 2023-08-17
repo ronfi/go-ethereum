@@ -141,7 +141,7 @@ var (
 )
 
 var (
-	RonFiSwapV3Address = common.HexToAddress("0x64b33DEe8B15901A1aB2E75698f777Ff2DFd2Dd4")
+	RonFiSwapV3Address = common.HexToAddress("0xc95923C6b282b5aE38f804be610Feb34B69E158C")
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
