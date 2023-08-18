@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
+	ronswapv3fe "github.com/ethereum/go-ethereum/ronfi/contracts/contract_ronswapv3fe"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	v2 "github.com/ethereum/go-ethereum/ronfi/uniswap/v2"
@@ -190,6 +191,8 @@ type Worker struct {
 	huntingTxs    int64
 	huntingPairs  int
 	logHuntingTxs bool
+
+	ronSwapInst *ronswapv3fe.Ronswapv3fe
 
 	numCPU int
 }

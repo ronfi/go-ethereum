@@ -28,6 +28,8 @@ func (w *Worker) InitRonFiSwap() bool {
 	if ronV3Swap, err = ronswapv3fe.NewRonswapv3fe(txpool.RonFiSwapV3Address, w.client); err != nil {
 		log.Error("RonFi InitRonFiSwap New transactor instance Failed on Ronswapv3fe contract", "err", err)
 		return false
+	} else {
+		w.ronSwapInst = ronV3Swap
 	}
 
 	// create flash rpc

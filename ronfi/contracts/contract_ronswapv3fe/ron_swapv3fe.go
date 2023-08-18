@@ -28,8 +28,8 @@ var (
 	_ = event.NewSubscription
 )
 
-// RonExecutorEPayload is an auto generated low-level Go binding around an user-defined struct.
-type RonExecutorEPayload struct {
+// RonSwapV3FEPayload is an auto generated low-level Go binding around an user-defined struct.
+type RonSwapV3FEPayload struct {
 	Target common.Address
 	Data   []byte
 	Value  *big.Int
@@ -37,7 +37,7 @@ type RonExecutorEPayload struct {
 
 // Ronswapv3feMetaData contains all meta data concerning the Ronswapv3fe contract.
 var Ronswapv3feMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"addExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"delExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"internalType\":\"structRonExecutorE.Payload[]\",\"name\":\"payloads\",\"type\":\"tuple[]\"}],\"name\":\"executePayloads\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"uniswapV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"_charger\",\"type\":\"address\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"charger\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalOk\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"failed\",\"type\":\"bool\"}],\"name\":\"Deposited\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"addExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"delExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"isSandwich\",\"type\":\"bool\"},{\"internalType\":\"bool\",\"name\":\"isALeg\",\"type\":\"bool\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"internalType\":\"structRonSwapV3FE.Payload[]\",\"name\":\"payloads\",\"type\":\"tuple[]\"}],\"name\":\"executePayloads\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount0\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount1\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"pancakeCall\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"pancakeV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenPairsAndFee\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"amountIn\",\"type\":\"uint256\"}],\"name\":\"ronSwapV3\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"amountOut\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"}],\"name\":\"setFeeRate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount0\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount1\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"uniswapV2Call\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"uniswapV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
 }
 
 // Ronswapv3feABI is the input ABI used to generate the binding from.
@@ -228,46 +228,172 @@ func (_Ronswapv3fe *Ronswapv3feTransactorSession) DelExecutor(_executors []commo
 	return _Ronswapv3fe.Contract.DelExecutor(&_Ronswapv3fe.TransactOpts, _executors)
 }
 
-// ExecutePayloads is a paid mutator transaction binding the contract method 0x2685cff5.
+// Deposit is a paid mutator transaction binding the contract method 0xb6b55f25.
 //
-// Solidity: function executePayloads((address,bytes,uint256)[] payloads) payable returns()
-func (_Ronswapv3fe *Ronswapv3feTransactor) ExecutePayloads(opts *bind.TransactOpts, payloads []RonExecutorEPayload) (*types.Transaction, error) {
-	return _Ronswapv3fe.contract.Transact(opts, "executePayloads", payloads)
+// Solidity: function deposit(uint256 amount) payable returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) Deposit(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "deposit", amount)
 }
 
-// ExecutePayloads is a paid mutator transaction binding the contract method 0x2685cff5.
+// Deposit is a paid mutator transaction binding the contract method 0xb6b55f25.
 //
-// Solidity: function executePayloads((address,bytes,uint256)[] payloads) payable returns()
-func (_Ronswapv3fe *Ronswapv3feSession) ExecutePayloads(payloads []RonExecutorEPayload) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.ExecutePayloads(&_Ronswapv3fe.TransactOpts, payloads)
+// Solidity: function deposit(uint256 amount) payable returns()
+func (_Ronswapv3fe *Ronswapv3feSession) Deposit(amount *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.Deposit(&_Ronswapv3fe.TransactOpts, amount)
 }
 
-// ExecutePayloads is a paid mutator transaction binding the contract method 0x2685cff5.
+// Deposit is a paid mutator transaction binding the contract method 0xb6b55f25.
 //
-// Solidity: function executePayloads((address,bytes,uint256)[] payloads) payable returns()
-func (_Ronswapv3fe *Ronswapv3feTransactorSession) ExecutePayloads(payloads []RonExecutorEPayload) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.ExecutePayloads(&_Ronswapv3fe.TransactOpts, payloads)
+// Solidity: function deposit(uint256 amount) payable returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) Deposit(amount *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.Deposit(&_Ronswapv3fe.TransactOpts, amount)
+}
+
+// ExecutePayloads is a paid mutator transaction binding the contract method 0x18b41c6e.
+//
+// Solidity: function executePayloads(bool isSandwich, bool isALeg, (address,bytes,uint256)[] payloads) payable returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) ExecutePayloads(opts *bind.TransactOpts, isSandwich bool, isALeg bool, payloads []RonSwapV3FEPayload) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "executePayloads", isSandwich, isALeg, payloads)
+}
+
+// ExecutePayloads is a paid mutator transaction binding the contract method 0x18b41c6e.
+//
+// Solidity: function executePayloads(bool isSandwich, bool isALeg, (address,bytes,uint256)[] payloads) payable returns()
+func (_Ronswapv3fe *Ronswapv3feSession) ExecutePayloads(isSandwich bool, isALeg bool, payloads []RonSwapV3FEPayload) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.ExecutePayloads(&_Ronswapv3fe.TransactOpts, isSandwich, isALeg, payloads)
+}
+
+// ExecutePayloads is a paid mutator transaction binding the contract method 0x18b41c6e.
+//
+// Solidity: function executePayloads(bool isSandwich, bool isALeg, (address,bytes,uint256)[] payloads) payable returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) ExecutePayloads(isSandwich bool, isALeg bool, payloads []RonSwapV3FEPayload) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.ExecutePayloads(&_Ronswapv3fe.TransactOpts, isSandwich, isALeg, payloads)
+}
+
+// PancakeCall is a paid mutator transaction binding the contract method 0x84800812.
+//
+// Solidity: function pancakeCall(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) PancakeCall(opts *bind.TransactOpts, sender common.Address, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "pancakeCall", sender, amount0, amount1, _data)
+}
+
+// PancakeCall is a paid mutator transaction binding the contract method 0x84800812.
+//
+// Solidity: function pancakeCall(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feSession) PancakeCall(sender common.Address, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.PancakeCall(&_Ronswapv3fe.TransactOpts, sender, amount0, amount1, _data)
+}
+
+// PancakeCall is a paid mutator transaction binding the contract method 0x84800812.
+//
+// Solidity: function pancakeCall(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) PancakeCall(sender common.Address, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.PancakeCall(&_Ronswapv3fe.TransactOpts, sender, amount0, amount1, _data)
+}
+
+// PancakeV3SwapCallback is a paid mutator transaction binding the contract method 0x23a69e75.
+//
+// Solidity: function pancakeV3SwapCallback(int256 amount0, int256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) PancakeV3SwapCallback(opts *bind.TransactOpts, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "pancakeV3SwapCallback", amount0, amount1, _data)
+}
+
+// PancakeV3SwapCallback is a paid mutator transaction binding the contract method 0x23a69e75.
+//
+// Solidity: function pancakeV3SwapCallback(int256 amount0, int256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feSession) PancakeV3SwapCallback(amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.PancakeV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, _data)
+}
+
+// PancakeV3SwapCallback is a paid mutator transaction binding the contract method 0x23a69e75.
+//
+// Solidity: function pancakeV3SwapCallback(int256 amount0, int256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) PancakeV3SwapCallback(amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.PancakeV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, _data)
+}
+
+// RonSwapV3 is a paid mutator transaction binding the contract method 0x69bf3560.
+//
+// Solidity: function ronSwapV3(uint256[] tokenPairsAndFee, uint256 amountIn) returns(uint256 amountOut)
+func (_Ronswapv3fe *Ronswapv3feTransactor) RonSwapV3(opts *bind.TransactOpts, tokenPairsAndFee []*big.Int, amountIn *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "ronSwapV3", tokenPairsAndFee, amountIn)
+}
+
+// RonSwapV3 is a paid mutator transaction binding the contract method 0x69bf3560.
+//
+// Solidity: function ronSwapV3(uint256[] tokenPairsAndFee, uint256 amountIn) returns(uint256 amountOut)
+func (_Ronswapv3fe *Ronswapv3feSession) RonSwapV3(tokenPairsAndFee []*big.Int, amountIn *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.RonSwapV3(&_Ronswapv3fe.TransactOpts, tokenPairsAndFee, amountIn)
+}
+
+// RonSwapV3 is a paid mutator transaction binding the contract method 0x69bf3560.
+//
+// Solidity: function ronSwapV3(uint256[] tokenPairsAndFee, uint256 amountIn) returns(uint256 amountOut)
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) RonSwapV3(tokenPairsAndFee []*big.Int, amountIn *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.RonSwapV3(&_Ronswapv3fe.TransactOpts, tokenPairsAndFee, amountIn)
+}
+
+// SetFeeRate is a paid mutator transaction binding the contract method 0x45596e2e.
+//
+// Solidity: function setFeeRate(uint256 rate) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) SetFeeRate(opts *bind.TransactOpts, rate *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "setFeeRate", rate)
+}
+
+// SetFeeRate is a paid mutator transaction binding the contract method 0x45596e2e.
+//
+// Solidity: function setFeeRate(uint256 rate) returns()
+func (_Ronswapv3fe *Ronswapv3feSession) SetFeeRate(rate *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.SetFeeRate(&_Ronswapv3fe.TransactOpts, rate)
+}
+
+// SetFeeRate is a paid mutator transaction binding the contract method 0x45596e2e.
+//
+// Solidity: function setFeeRate(uint256 rate) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) SetFeeRate(rate *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.SetFeeRate(&_Ronswapv3fe.TransactOpts, rate)
+}
+
+// UniswapV2Call is a paid mutator transaction binding the contract method 0x10d1e85c.
+//
+// Solidity: function uniswapV2Call(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) UniswapV2Call(opts *bind.TransactOpts, sender common.Address, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "uniswapV2Call", sender, amount0, amount1, _data)
+}
+
+// UniswapV2Call is a paid mutator transaction binding the contract method 0x10d1e85c.
+//
+// Solidity: function uniswapV2Call(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feSession) UniswapV2Call(sender common.Address, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.UniswapV2Call(&_Ronswapv3fe.TransactOpts, sender, amount0, amount1, _data)
+}
+
+// UniswapV2Call is a paid mutator transaction binding the contract method 0x10d1e85c.
+//
+// Solidity: function uniswapV2Call(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) UniswapV2Call(sender common.Address, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.UniswapV2Call(&_Ronswapv3fe.TransactOpts, sender, amount0, amount1, _data)
 }
 
 // UniswapV3SwapCallback is a paid mutator transaction binding the contract method 0xfa461e33.
 //
-// Solidity: function uniswapV3SwapCallback(int256 amount0, int256 amount1, bytes ) returns()
-func (_Ronswapv3fe *Ronswapv3feTransactor) UniswapV3SwapCallback(opts *bind.TransactOpts, amount0 *big.Int, amount1 *big.Int, arg2 []byte) (*types.Transaction, error) {
-	return _Ronswapv3fe.contract.Transact(opts, "uniswapV3SwapCallback", amount0, amount1, arg2)
+// Solidity: function uniswapV3SwapCallback(int256 amount0, int256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) UniswapV3SwapCallback(opts *bind.TransactOpts, amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "uniswapV3SwapCallback", amount0, amount1, _data)
 }
 
 // UniswapV3SwapCallback is a paid mutator transaction binding the contract method 0xfa461e33.
 //
-// Solidity: function uniswapV3SwapCallback(int256 amount0, int256 amount1, bytes ) returns()
-func (_Ronswapv3fe *Ronswapv3feSession) UniswapV3SwapCallback(amount0 *big.Int, amount1 *big.Int, arg2 []byte) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.UniswapV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, arg2)
+// Solidity: function uniswapV3SwapCallback(int256 amount0, int256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feSession) UniswapV3SwapCallback(amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.UniswapV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, _data)
 }
 
 // UniswapV3SwapCallback is a paid mutator transaction binding the contract method 0xfa461e33.
 //
-// Solidity: function uniswapV3SwapCallback(int256 amount0, int256 amount1, bytes ) returns()
-func (_Ronswapv3fe *Ronswapv3feTransactorSession) UniswapV3SwapCallback(amount0 *big.Int, amount1 *big.Int, arg2 []byte) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.UniswapV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, arg2)
+// Solidity: function uniswapV3SwapCallback(int256 amount0, int256 amount1, bytes _data) returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) UniswapV3SwapCallback(amount0 *big.Int, amount1 *big.Int, _data []byte) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.UniswapV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, _data)
 }
 
 // Withdraw is a paid mutator transaction binding the contract method 0x00f714ce.
@@ -310,4 +436,151 @@ func (_Ronswapv3fe *Ronswapv3feSession) Receive() (*types.Transaction, error) {
 // Solidity: receive() payable returns()
 func (_Ronswapv3fe *Ronswapv3feTransactorSession) Receive() (*types.Transaction, error) {
 	return _Ronswapv3fe.Contract.Receive(&_Ronswapv3fe.TransactOpts)
+}
+
+// Ronswapv3feDepositedIterator is returned from FilterDeposited and is used to iterate over the raw logs and unpacked data for Deposited events raised by the Ronswapv3fe contract.
+type Ronswapv3feDepositedIterator struct {
+	Event *Ronswapv3feDeposited // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *Ronswapv3feDepositedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(Ronswapv3feDeposited)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(Ronswapv3feDeposited)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *Ronswapv3feDepositedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *Ronswapv3feDepositedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// Ronswapv3feDeposited represents a Deposited event raised by the Ronswapv3fe contract.
+type Ronswapv3feDeposited struct {
+	Charger     common.Address
+	TotalOk     *big.Int
+	TotalAmount *big.Int
+	Failed      bool
+	Raw         types.Log // Blockchain specific contextual infos
+}
+
+// FilterDeposited is a free log retrieval operation binding the contract event 0x65e6f89b6907d6277741ee4ccbc4ae260163a17f16bbb55b5344dff064867c40.
+//
+// Solidity: event Deposited(address indexed charger, uint256 totalOk, uint256 totalAmount, bool failed)
+func (_Ronswapv3fe *Ronswapv3feFilterer) FilterDeposited(opts *bind.FilterOpts, charger []common.Address) (*Ronswapv3feDepositedIterator, error) {
+
+	var chargerRule []interface{}
+	for _, chargerItem := range charger {
+		chargerRule = append(chargerRule, chargerItem)
+	}
+
+	logs, sub, err := _Ronswapv3fe.contract.FilterLogs(opts, "Deposited", chargerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &Ronswapv3feDepositedIterator{contract: _Ronswapv3fe.contract, event: "Deposited", logs: logs, sub: sub}, nil
+}
+
+// WatchDeposited is a free log subscription operation binding the contract event 0x65e6f89b6907d6277741ee4ccbc4ae260163a17f16bbb55b5344dff064867c40.
+//
+// Solidity: event Deposited(address indexed charger, uint256 totalOk, uint256 totalAmount, bool failed)
+func (_Ronswapv3fe *Ronswapv3feFilterer) WatchDeposited(opts *bind.WatchOpts, sink chan<- *Ronswapv3feDeposited, charger []common.Address) (event.Subscription, error) {
+
+	var chargerRule []interface{}
+	for _, chargerItem := range charger {
+		chargerRule = append(chargerRule, chargerItem)
+	}
+
+	logs, sub, err := _Ronswapv3fe.contract.WatchLogs(opts, "Deposited", chargerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(Ronswapv3feDeposited)
+				if err := _Ronswapv3fe.contract.UnpackLog(event, "Deposited", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseDeposited is a log parse operation binding the contract event 0x65e6f89b6907d6277741ee4ccbc4ae260163a17f16bbb55b5344dff064867c40.
+//
+// Solidity: event Deposited(address indexed charger, uint256 totalOk, uint256 totalAmount, bool failed)
+func (_Ronswapv3fe *Ronswapv3feFilterer) ParseDeposited(log types.Log) (*Ronswapv3feDeposited, error) {
+	event := new(Ronswapv3feDeposited)
+	if err := _Ronswapv3fe.contract.UnpackLog(event, "Deposited", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
