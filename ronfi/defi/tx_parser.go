@@ -36,6 +36,29 @@ const (
 	RonFiExtractTypePairs
 )
 
+func (di *Info) ExtractTransferAmount(vLogs []*types.Log, token, src, dst common.Address) *big.Int {
+	for _, vlog := range vLogs {
+		if len(vlog.Topics) > 0 {
+			topic0 := vlog.Topics[0]
+			data := vlog.Data
+			address := vlog.Address
+			if address == token && topic0 == state.TokenTransferEvent {
+				if len(data) == 32 && len(vlog.Topics) == 3 {
+					from := common.BytesToAddress(vlog.Topics[1].Bytes())
+					to := common.BytesToAddress(vlog.Topics[2].Bytes())
+					amount := new(big.Int).SetBytes(data[18:32])
+
+					if from == src && to == dst {
+						return amount
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address, vLogs []*types.Log, eType RonFiExtractType) []*SwapPairInfo {
 	var syncPairInfo *V2SyncInfo // there must have a 'sync' event before any 'swap'/'mint'/'burn' event.
 

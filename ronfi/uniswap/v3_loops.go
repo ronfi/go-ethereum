@@ -462,6 +462,9 @@ func isStaledPools(di *defi.Info, addr, token0, token1 common.Address) bool {
 	}
 
 	token0Bal := di.GetTokenBalance(addr, token0)
+	if token0Bal == nil {
+		return true
+	}
 	token0Info := di.GetTokenInfo(token0)
 	if token0Info == nil {
 		return true
