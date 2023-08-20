@@ -202,7 +202,10 @@ func (s *RonSandwich) buildSwapTx(appState *state.StateDB, pool *defi.SwapPairIn
 			return
 		}
 
-		v2PoolInst.UpdateReserves(nil)
+		if !v2PoolInst.UpdateReserves(nil) {
+			//log.Warn("RonFi Sandwich buildSwapTx UpdateReserves failed", "pair", pool.Address)
+			return
+		}
 		amountOut = v2PoolInst.CalculateTokensOutFromTokensIn(pool.TokenIn, amountIn)
 		if amountOut == nil || amountOut.Cmp(big.NewInt(0)) <= 0 {
 			//log.Warn("RonFi Sandwich buildSwapTx CalculateTokensOutFromTokensIn failed", "pair", pool.Address)
@@ -257,7 +260,10 @@ func (s *RonSandwich) buildSwapTx(appState *state.StateDB, pool *defi.SwapPairIn
 				return
 			}
 
-			v3PoolInst.UpdatePoolState(nil)
+			if !v3PoolInst.UpdatePoolState(nil) {
+				//log.Warn("RonFi Sandwich buildSwapTx UpdatePoolState failed", "pool", pool.Address)
+				return
+			}
 			amountOut, _ = v3PoolInst.CalculateTokensOutFromTokensIn(pool.TokenIn, amountIn)
 			if amountOut == nil || amountOut.Cmp(big.NewInt(0)) <= 0 {
 				//log.Warn("RonFi Sandwich buildSwapTx CalculateTokensOutFromTokensIn failed", "pair", pool.Address)
