@@ -678,7 +678,7 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 	if appState == nil {
 		log.Warn("RonFi handlePromotedTx appState is nil")
 	} else {
-		applySuccess, reverted, err = w.applyTransaction(tx, ronfiTxHash, appState)
+		applySuccess, reverted, _, err = w.applyTransaction(tx, ronfiTxHash, appState)
 		if !applySuccess || reverted {
 			w.ReportSkipReason(tx, SkipReasonApplyTransactionFail, err)
 			return
@@ -923,13 +923,13 @@ func (w *Worker) huntingTxPair(tx *types.Transaction, pairId int, handlerStartTi
 	}
 }
 
-func (w *Worker) applyTransaction(tx *types.Transaction, txHash common.Hash, state *state.StateDB) (bool, bool, string) {
+func (w *Worker) applyTransaction(tx *types.Transaction, txHash common.Hash, state *state.StateDB) (bool, bool, uint64, string) {
 	if state == nil {
-		return false, false, "state == nil"
+		return false, false, 0, "state == nil"
 	}
 
 	if w.chain == nil {
-		return false, false, "w.chain == nil"
+		return false, false, 0, "w.chain == nil"
 	}
 
 	gasPool := new(core.GasPool).AddGas(85_000_000)
@@ -938,10 +938,10 @@ func (w *Worker) applyTransaction(tx *types.Transaction, txHash common.Hash, sta
 
 	state.SetTxContext(txHash, 0)
 	// 'applySuccess' is the status of ApplyTransaction, 'failed' is the status of whether an applied transaction is reverted (i.e. failed but packed into blockchain).
-	if applySuccess, failed, _, err := core.ApplyRonfiTransaction(w.chainConfig, w.chain, author, gasPool, state, w.currentBlock.Header(), tx, *w.chain.GetVMConfig()); applySuccess {
-		return applySuccess, failed, err
+	if applySuccess, failed, gasUsed, err := core.ApplyRonfiTransaction(w.chainConfig, w.chain, author, gasPool, state, w.currentBlock.Header(), tx, *w.chain.GetVMConfig()); applySuccess {
+		return applySuccess, failed, gasUsed, err
 	} else {
-		return applySuccess, failed, err
+		return applySuccess, failed, gasUsed, err
 	}
 }
 
