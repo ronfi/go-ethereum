@@ -36,6 +36,8 @@ func (w *Worker) InitRonFiSwap() bool {
 	if flashRpc = flashbotsrpc.NewBuilderBroadcastRPC(falshbotURLs); err != nil {
 		log.Error("RonFi InitRonFiSwap create flashbot rpc failed!", "err", err)
 		return false
+	} else {
+		w.flashRpc = flashRpc
 	}
 
 	return true

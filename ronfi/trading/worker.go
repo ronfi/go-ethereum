@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	v2 "github.com/ethereum/go-ethereum/ronfi/uniswap/v2"
 	v3 "github.com/ethereum/go-ethereum/ronfi/uniswap/v3"
+	"github.com/metachris/flashbotsrpc"
 	"math/big"
 	"os"
 	"runtime"
@@ -193,6 +194,7 @@ type Worker struct {
 	logHuntingTxs bool
 
 	ronSwapInst *ronswapv3fe.Ronswapv3fe
+	flashRpc    *flashbotsrpc.BuilderBroadcastRPC
 
 	numCPU int
 }
@@ -707,9 +709,10 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInf
 	if ronSandWich == nil {
 		return
 	}
-	ronSandWich.Build()
-
-	log.Info("RonFi sandwichTx", "tx", tx.Hash().String(), "elapsed", mclock.Since(handlerStartTime))
+	if txs, ok := ronSandWich.Build(); ok {
+		log.Info("RonFi sandwichTx", "tx", tx.Hash().String(), "elapsed", mclock.Since(handlerStartTime))
+		Flashbot(w.flashRpc, w.currentBlock, w.currentBlockNum, txs)
+	}
 }
 
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
