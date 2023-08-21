@@ -38,9 +38,9 @@ func Flashbot(flashRpc *flashbotsrpc.BuilderBroadcastRPC, block *types.Block, cu
 	}
 
 	results := flashRpc.BroadcastBundle(privateKey, sendBundleArgs)
-	for i, result := range results {
+	for _, result := range results {
 		if result.Err != nil {
-			log.Warn("RonFi Falshbot broadcast failed", "tx", txs[i].Hash().String(), "err", result.Err)
+			log.Warn("RonFi Falshbot broadcast failed", "tx", txs[1].Hash().String(), "err", result.Err)
 		} else {
 			log.Info("RonFi Flashbot", "response", result.BundleResponse.BundleHash)
 		}
@@ -93,9 +93,9 @@ func FlashbotSandWich(flashRpc *flashbotsrpc.BuilderBroadcastRPC, block *types.B
 	}
 
 	results := flashRpc.BroadcastBundle(privateKey, sendBundleArgs)
-	for i, result := range results {
+	for _, result := range results {
 		if result.Err != nil {
-			log.Warn("RonFi FlashbotSandWich broadcast failed", "tx", txs[i].Hash().String(), "err", result.Err)
+			log.Warn("RonFi FlashbotSandWich broadcast failed", "tx", txs[1].Hash().String(), "err", result.Err)
 		} else {
 			log.Info("RonFi FlashbotSandWich", "response", result.BundleResponse.BundleHash)
 		}
