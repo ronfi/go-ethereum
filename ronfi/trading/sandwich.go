@@ -107,7 +107,7 @@ func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
 			// bLeg tx
 			rPool := pool.Reverse()
 			bLegAmountIn := aLegAmountOut
-			if feeRate != nil {
+			if feeRate != nil && feeRate.Cmp(big.NewInt(0)) > 0 {
 				bLegAmountIn = new(big.Int).Sub(aLegAmountOut, new(big.Int).Div(new(big.Int).Mul(aLegAmountOut, feeRate), big.NewInt(10000)))
 			}
 			if _, _, bLegAmountOut, gasUsed, ok := s.sandWichTx(rPool, bLegAmountIn, appState, false); !ok {
@@ -115,7 +115,7 @@ func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
 					"tx", s.targetTx.Hash(),
 					"pair", rPool.Address,
 					"tokenIn", rPool.TokenIn,
-					"amountIn", aLegAmountOut)
+					"amountIn", bLegAmountIn)
 				return txs, false
 			} else {
 				bLegGasUsed = gasUsed
@@ -131,6 +131,13 @@ func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
 					bribeFee := new(big.Int).Div(new(big.Int).Mul(netProfit, big.NewInt(60)), big.NewInt(100)) // 80% net profit to miner
 					bLegTxFee := new(big.Int).Add(new(big.Int).Mul(big.NewInt(int64(bLegGasUsed)), s.worker.gasPrice), bribeFee)
 					bLegGasFee := new(big.Int).Div(bLegTxFee, big.NewInt(int64(bLegGasUsed)))
+					log.Info("RonFi Sandwich Build profitable",
+						"tx", s.targetTx.Hash(),
+						"pair", pool.Address,
+						"amountIn", amountIn,
+						"amountOut", bLegAmountOut,
+						"netProfit", netProfit)
+
 					payloads := s.generatePayloads(rPool, bLegAmountIn, appState)
 					if len(payloads) == 0 {
 						return txs, false
@@ -165,24 +172,19 @@ func (s *RonSandwich) optimize(pool *defi.SwapPairInfo, amountIn *big.Int) bool 
 		)
 
 		payloads := s.generatePayloads(pool, amountIn, appState)
-		if len(payloads) == 0 {
-			return nil, false, false
-		}
-
-		// create tx and apply
-		nonce := appState.GetNonce(s.execAddress)
-		if frontRunTx := s.buildExecuteTx(pool, payloads, false, false, nonce, s.worker.gasPrice); frontRunTx != nil {
-			applySuccess, reverted, _, _ = s.worker.applyTransaction(frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState)
-			if !applySuccess || reverted {
-				return nil, false, false
-			}
-
-			targetTxHash := ronFiTxHash(s.targetTx.Hash())
-			if applySuccess, reverted, _, _ = s.worker.applyTransaction(s.targetTx, targetTxHash, appState); applySuccess && !reverted {
-				log.Info("RonFi Sandwich calculateF applyTransaction targetTx succeed!", "targetTx", s.targetTx.Hash().String(), "pair", pool.Address, "amountIn", amountIn)
-				return frontRunTx, false, true
-			} else {
-				return nil, true, false
+		if len(payloads) > 0 {
+			// create tx and apply
+			nonce := appState.GetNonce(s.execAddress)
+			if frontRunTx := s.buildExecuteTx(pool, payloads, false, false, nonce, s.worker.gasPrice); frontRunTx != nil {
+				if applySuccess, reverted, _, _ = s.worker.applyTransaction(frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState); applySuccess && !reverted {
+					targetTxHash := ronFiTxHash(s.targetTx.Hash())
+					if applySuccess, reverted, _, _ = s.worker.applyTransaction(s.targetTx, targetTxHash, appState); applySuccess && !reverted {
+						//log.Info("RonFi Sandwich calculateF applyTransaction targetTx succeed!", "targetTx", s.targetTx.Hash().String(), "pair", pool.Address, "amountIn", amountIn)
+						return frontRunTx, false, true
+					} else {
+						return nil, true, false
+					}
+				}
 			}
 		}
 
@@ -213,9 +215,9 @@ func (s *RonSandwich) binarySearch(pool *defi.SwapPairInfo, calculateF func(appS
 
 	if amountIn.Cmp(big.NewInt(0)) > 0 {
 		return true
-	} else {
-		return false
 	}
+
+	return false
 }
 
 func (s *RonSandwich) genTransTxPayload(token common.Address, to common.Address, amount *big.Int) *ronswapv3fe.RonSwapV3FEPayload {
@@ -399,6 +401,7 @@ func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, app
 		applySuccess, reverted bool
 		gasUsed                uint64
 		err                    string
+		swapAmountOut, feeRate *big.Int
 	)
 
 	payloads := s.generatePayloads(pool, amountIn, appState)
@@ -424,30 +427,33 @@ func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, app
 		}
 
 		vlogs := appState.GetLogs(ronFiTxHash(tx.Hash()), s.worker.currentBlockNum, common.Hash{})
-		swapPairsInfo := s.worker.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
-		if len(swapPairsInfo) == 0 {
-			return nil, nil, nil, 0, false
-		} else {
-			info := swapPairsInfo[0]
-			swapAmountOut := info.AmountOut
-			if bAmountOut := s.worker.di.ExtractTransferAmount(vlogs, pool.TokenOut, pool.Address, txpool.RonFiSwapV3Address); bAmountOut != nil && bAmountOut.Cmp(big.NewInt(0)) > 0 {
-				var feeRate *big.Int
-				if bAmountOut.Cmp(swapAmountOut) != 0 {
-					log.Warn("RonFi Sandwich bAmountOut != swapAmountOut",
-						"tx", s.targetTx.Hash(),
-						"pair", pool.Address,
-						"tokenIn", pool.TokenIn,
-						"amountIn", amountIn,
-						"isAleg", isAleg,
-						"swapAmountOut", swapAmountOut,
-						"bAmountOut", bAmountOut)
-					feeRate = new(big.Int).Div(new(big.Int).Mul(big.NewInt(10000), new(big.Int).Sub(swapAmountOut, bAmountOut)), swapAmountOut)
-					feeRate = new(big.Int).Add(feeRate, big.NewInt(1))
-				}
-				return tx, feeRate, bAmountOut, gasUsed, true
+		if isAleg {
+			swapPairsInfo := s.worker.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
+			if len(swapPairsInfo) == 0 {
+				return nil, nil, nil, 0, false
 			}
+
+			info := swapPairsInfo[0]
+			swapAmountOut = info.AmountOut
 		}
 
+		if bAmountOut := s.worker.di.ExtractTransferAmount(vlogs, pool.TokenOut, pool.Address, txpool.RonFiSwapV3Address); bAmountOut != nil && bAmountOut.Cmp(big.NewInt(0)) > 0 {
+			if isAleg && bAmountOut.Cmp(swapAmountOut) != 0 {
+				feeRate = new(big.Int).Div(new(big.Int).Mul(big.NewInt(10000), new(big.Int).Sub(swapAmountOut, bAmountOut)), swapAmountOut)
+				feeRate = new(big.Int).Add(feeRate, big.NewInt(1))
+
+				log.Warn("RonFi Sandwich bAmountOut != swapAmountOut",
+					"tx", s.targetTx.Hash(),
+					"pair", pool.Address,
+					"tokenIn", pool.TokenIn,
+					"amountIn", amountIn,
+					"isAleg", isAleg,
+					"feeRate", feeRate,
+					"swapAmountOut", swapAmountOut,
+					"bAmountOut", bAmountOut)
+			}
+			return tx, feeRate, bAmountOut, gasUsed, true
+		}
 	}
 
 	return nil, nil, nil, 0, false
