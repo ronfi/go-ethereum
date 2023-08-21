@@ -128,32 +128,44 @@ func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
 					totalGasUsed := aLegGasUsed + bLegGasUsed
 					txFee := new(big.Int).Mul(big.NewInt(int64(totalGasUsed)), s.worker.gasPrice)
 					netProfit := new(big.Int).Sub(profit, txFee)
-					bribeFee := new(big.Int).Div(new(big.Int).Mul(netProfit, big.NewInt(60)), big.NewInt(100)) // 80% net profit to miner
-					bLegTxFee := new(big.Int).Add(new(big.Int).Mul(big.NewInt(int64(bLegGasUsed)), s.worker.gasPrice), bribeFee)
-					bLegGasFee := new(big.Int).Div(bLegTxFee, big.NewInt(int64(bLegGasUsed)))
-					log.Info("RonFi Sandwich Build profitable",
-						"tx", s.targetTx.Hash(),
-						"pair", pool.Address,
-						"amountIn", amountIn,
-						"amountOut", bLegAmountOut,
-						"netProfit", netProfit)
-
-					payloads := s.generatePayloads(rPool, bLegAmountIn, appState)
-					if len(payloads) == 0 {
+					if netProfit.Cmp(big.NewInt(0)) <= 0 {
+						log.Warn("RonFi Sandwich Build net profit not profitable",
+							"tx", s.targetTx.Hash(),
+							"pair", pool.Address,
+							"amountIn", amountIn,
+							"amountOut", bLegAmountOut,
+							"profit", profit,
+							"netProfit", netProfit,
+							"txFee", txFee)
 						return txs, false
-					}
-					if tx := s.buildExecuteTx(pool, payloads, true, false, s.appState.GetNonce(s.execAddress)+1, bLegGasFee); tx != nil {
-						txs = append(txs, tx)
-						if profit.Cmp(txFee) > 0 {
-							log.Info("RonFi Sandwich Build profitable",
-								"tx", s.targetTx.Hash(),
-								"pair", pool.Address,
-								"amountIn", amountIn,
-								"amountOut", bLegAmountOut,
-								"profit", profit,
-								"bribeFee", bribeFee,
-								"ronProfit", new(big.Int).Sub(netProfit, bribeFee))
-							return txs, true
+					} else {
+						bribeFee := new(big.Int).Div(new(big.Int).Mul(netProfit, big.NewInt(60)), big.NewInt(100)) // 80% net profit to miner
+						bLegTxFee := new(big.Int).Add(new(big.Int).Mul(big.NewInt(int64(bLegGasUsed)), s.worker.gasPrice), bribeFee)
+						bLegGasFee := new(big.Int).Div(bLegTxFee, big.NewInt(int64(bLegGasUsed)))
+						log.Info("RonFi Sandwich Build profitable",
+							"tx", s.targetTx.Hash(),
+							"pair", pool.Address,
+							"amountIn", amountIn,
+							"amountOut", bLegAmountOut,
+							"netProfit", netProfit)
+
+						payloads := s.generatePayloads(rPool, bLegAmountIn, appState)
+						if len(payloads) == 0 {
+							return txs, false
+						}
+						if tx := s.buildExecuteTx(pool, payloads, true, false, s.appState.GetNonce(s.execAddress)+1, bLegGasFee); tx != nil {
+							txs = append(txs, tx)
+							if profit.Cmp(txFee) > 0 {
+								log.Info("RonFi Sandwich Build profitable",
+									"tx", s.targetTx.Hash(),
+									"pair", pool.Address,
+									"amountIn", amountIn,
+									"amountOut", bLegAmountOut,
+									"profit", profit,
+									"bribeFee", bribeFee,
+									"ronProfit", new(big.Int).Sub(netProfit, bribeFee))
+								return txs, true
+							}
 						}
 					}
 				}
