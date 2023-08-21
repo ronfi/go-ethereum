@@ -355,6 +355,23 @@ func (s *RonSandwich) genSwapTxPayload(appState *state.StateDB, pool *defi.SwapP
 	return
 }
 
+func (s *RonSandwich) generatePayloads(pool *defi.SwapPairInfo, amountIn *big.Int, appState *state.StateDB) []ronswapv3fe.RonSwapV3FEPayload {
+	payloads := make([]ronswapv3fe.RonSwapV3FEPayload, 0, 10)
+	if !pool.V3 {
+		if payload := s.genTransTxPayload(pool.TokenIn, pool.Address, amountIn); payload != nil {
+			payloads = append(payloads, *payload)
+		} else {
+			return payloads
+		}
+	}
+
+	if payload, amountOut, ok := s.genSwapTxPayload(appState, pool, amountIn); ok && amountOut != nil && amountOut.Cmp(big.NewInt(0)) > 0 {
+		payloads = append(payloads, payload)
+	}
+
+	return payloads
+}
+
 func (s *RonSandwich) buildExecuteTx(pool *defi.SwapPairInfo, payloads []ronswapv3fe.RonSwapV3FEPayload, isSandwich, isAleg bool, nonce uint64, gasFee *big.Int) *types.Transaction {
 	if options, err := bind.NewKeyedTransactorWithChainID(s.privKey, big.NewInt(rcommon.CHAIN_ID)); err != nil {
 		return nil
@@ -375,23 +392,6 @@ func (s *RonSandwich) buildExecuteTx(pool *defi.SwapPairInfo, payloads []ronswap
 	}
 
 	return nil
-}
-
-func (s *RonSandwich) generatePayloads(pool *defi.SwapPairInfo, amountIn *big.Int, appState *state.StateDB) []ronswapv3fe.RonSwapV3FEPayload {
-	payloads := make([]ronswapv3fe.RonSwapV3FEPayload, 0, 10)
-	if !pool.V3 {
-		if payload := s.genTransTxPayload(pool.TokenIn, pool.Address, amountIn); payload != nil {
-			payloads = append(payloads, *payload)
-		} else {
-			return payloads
-		}
-	}
-
-	if payload, amountOut, ok := s.genSwapTxPayload(appState, pool, amountIn); ok && amountOut != nil && amountOut.Cmp(big.NewInt(0)) > 0 {
-		payloads = append(payloads, payload)
-	}
-
-	return payloads
 }
 
 func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, appState *state.StateDB, isAleg bool) (*types.Transaction, *big.Int, *big.Int, uint64, bool) {
