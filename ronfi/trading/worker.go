@@ -709,7 +709,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInf
 	if ronSandWich == nil {
 		return
 	}
-	if txs, ok := ronSandWich.Build(); ok {
+	if txs, ok := ronSandWich.Build(); ok && len(txs) >= 3 {
 		log.Info("RonFi sandwichTx", "tx", tx.Hash().String(), "elapsed", mclock.Since(handlerStartTime))
 		Flashbot(w.flashRpc, w.currentBlock, w.currentBlockNum, txs)
 	}

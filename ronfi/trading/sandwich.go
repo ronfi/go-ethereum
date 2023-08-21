@@ -256,6 +256,11 @@ func (s *RonSandwich) buildSwapTx(appState *state.StateDB, pool *defi.SwapPairIn
 			amount0Out = amountOut
 		}
 
+		if amount0Out.Cmp(big.NewInt(0)) <= 0 && amount1Out.Cmp(big.NewInt(0)) <= 0 {
+			log.Warn("RonFi Sandwich buildSwapTx amount0Out and amount1Out both <= 0", "pair", pool.Address)
+			return
+		}
+
 		// Define ABI
 		v2PairAbi, err := abi.JSON(strings.NewReader(v2.V2pairABI))
 		if err != nil {
