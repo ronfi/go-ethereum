@@ -3,9 +3,12 @@ package defi
 import (
 	"context"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/db"
+	"math/big"
 	"testing"
 )
 
@@ -34,7 +37,8 @@ func TestInfo_GetArbTxProfit(t *testing.T) {
 	if dbInst == nil {
 		t.Fatalf("TestInfo_CheckIfObs NewMysql failed!")
 	}
-	info := NewInfo(client, dbInst)
+	signer := types.NewEIP155Signer(big.NewInt(1))
+	info := NewInfo(client, dbInst, signer)
 
 	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x0a288cca5cb3e9349722a940d39b3b1ba3ee1902d3b77ffc30353614013e9a06"))
 	if err != nil {
@@ -78,7 +82,12 @@ func TestInfo_CheckIfObs(t *testing.T) {
 	if dbInst == nil {
 		t.Fatalf("TestInfo_CheckIfObs NewMysql failed!")
 	}
-	info := NewInfo(client, dbInst)
+
+	config := &params.ChainConfig{
+		ChainID: big.NewInt(1),
+	}
+	signer := types.MakeSigner(config, big.NewInt(17034870), 1681266455)
+	info := NewInfo(client, dbInst, signer)
 
 	tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash("0x7058aee966509fd467f8c35e390235d9180cca8dce5f92cc3f4f8180c9519161"))
 	if err != nil {

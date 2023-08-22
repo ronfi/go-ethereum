@@ -585,7 +585,7 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int
 						// sandwich attack found
 						aLegAmount := aLegInfo.AmountIn
 						bLegAmount := bLegInfo.AmountOut
-						if bLegAmount.Cmp(bLegAmount) > 0 {
+						if bLegAmount.Cmp(aLegAmount) > 0 {
 							profit := new(big.Int).Sub(bLegAmount, aLegAmount)
 							if _, ok := rcommon.TradableTokens[aLegInfo.TokenIn]; ok {
 								if tokenInfo := di.GetTokenInfo(aLegInfo.TokenIn); tokenInfo != nil {

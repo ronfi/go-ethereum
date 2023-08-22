@@ -1,10 +1,14 @@
 package defi
 
 import (
+	"context"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	"github.com/ethereum/go-ethereum/ronfi/db"
+	"math/big"
 	"testing"
 )
 
@@ -69,7 +73,12 @@ func TestInfo_GetPairInfo(t *testing.T) {
 	if dbInst == nil {
 		t.Fatalf("TestInfo_GetPairInfo NewMysql failed!")
 	}
-	info := NewInfo(client, dbInst)
+
+	config := &params.ChainConfig{
+		ChainID: big.NewInt(1),
+	}
+	signer := types.MakeSigner(config, big.NewInt(17034870), 1681266455)
+	info := NewInfo(client, dbInst, signer)
 
 	for _, tc := range tests {
 		got := info.GetPairInfo(tc.pairAddress)
@@ -106,12 +115,79 @@ func TestInfo_GetPairReserves(t *testing.T) {
 	if dbInst == nil {
 		t.Fatalf("TestInfo_CheckIfObs NewMysql failed!")
 	}
-	info := NewInfo(client, dbInst)
+	config := &params.ChainConfig{
+		ChainID: big.NewInt(1),
+	}
+	signer := types.MakeSigner(config, big.NewInt(17034870), 1681266455)
+	info := NewInfo(client, dbInst, signer)
 
 	resv := info.GetPairReserves(common.HexToAddress("0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"))
 	if resv == nil {
 		t.Fatalf("TestInfo_GetPairReserves getPairReserves failed!")
 	} else {
 		t.Logf("TestInfo_GetPairReserves reserve0: %v, reserve1: %v, timeStamp: %v", resv.Reserve0, resv.Reserve1, resv.Timestamp)
+	}
+}
+
+func TestInfo_CheckIfSandwichAttack(t *testing.T) {
+	client, err := ethclient.Dial("https://nd-804-879-862.p2pify.com/ca0df7232f6a54347593373cfbf94df8")
+	if err != nil {
+		t.Fatal("TestInfo_CheckIfSandwichAttack dial eth client failed!")
+	}
+
+	defer func() {
+		if client != nil {
+			client.Close()
+		}
+	}()
+
+	conf := rcommon.MysqlConfig{
+		DbHost: "176.9.120.196",
+		DbPort: "3306",
+		DbUser: "root",
+		DbPass: "rkdb",
+		DbData: "rkdb_eth",
+	}
+	dbInst := db.NewMysql(conf)
+	if dbInst == nil {
+		t.Fatalf("TestInfo_CheckIfSandwichAttack NewMysql failed!")
+	}
+
+	config := &params.ChainConfig{
+		ChainID: big.NewInt(1),
+	}
+	signer := types.MakeSigner(config, big.NewInt(17034870), 1681266455)
+	info := NewInfo(client, dbInst, signer)
+
+	aLegTxHash := common.HexToHash("0x88d834c48c5116250e84c1f2257a108d827fd0106fc57d1e139a5eae53833bf1")
+	if aLegTx, _, err := client.TransactionByHash(context.Background(), aLegTxHash); err == nil {
+		if aLegReceipt, err := client.TransactionReceipt(context.Background(), aLegTxHash); err == nil {
+			aLeg := &TxAndReceipt{
+				Tx:      aLegTx,
+				Receipt: aLegReceipt,
+			}
+
+			targetTxhash := common.HexToHash("0x9eca86325196b80097401d5417ecfee2b6acd4aee04d895993f61587c91e6d7c")
+			if targetTx, _, err := client.TransactionByHash(context.Background(), targetTxhash); err == nil {
+				if targetReceipt, err := client.TransactionReceipt(context.Background(), targetTxhash); err == nil {
+					target := &TxAndReceipt{
+						Tx:      targetTx,
+						Receipt: targetReceipt,
+					}
+
+					bLegTxhash := common.HexToHash("0x9b64b58b5b16bafc16b5d8029fd63432136c73fd6d5526052209ee304d417d84")
+					if bLegTx, _, err := client.TransactionByHash(context.Background(), bLegTxhash); err == nil {
+						if bLegReceipt, err := client.TransactionReceipt(context.Background(), bLegTxhash); err == nil {
+							bLeg := &TxAndReceipt{
+								Tx:      bLegTx,
+								Receipt: bLegReceipt,
+							}
+
+							info.CheckIfSandwichAttack(aLeg, target, bLeg)
+						}
+					}
+				}
+			}
+		}
 	}
 }
