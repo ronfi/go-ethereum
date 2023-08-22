@@ -65,7 +65,7 @@ func (s *Stats) report(header *types.Header) {
 		PrevBlockTxs = len(blockTxs)
 	}()
 
-	for _, tx := range blockTxs {
+	for i, tx := range blockTxs {
 		to := tx.To()
 		if to == nil {
 			continue
@@ -89,6 +89,23 @@ func (s *Stats) report(header *types.Header) {
 			continue
 		}
 		receipt := receipts[txLookup.Index]
+
+		// check if sandwich attack
+		if i >= 2 {
+			aLeg := defi.TxAndReceipt{
+				Tx:      blockTxs[i-2],
+				Receipt: receipts[txLookup.Index-2],
+			}
+			target := defi.TxAndReceipt{
+				Tx:      blockTxs[i-1],
+				Receipt: receipts[txLookup.Index-1],
+			}
+			bLeg := defi.TxAndReceipt{
+				Tx:      tx,
+				Receipt: receipt,
+			}
+			s.di.CheckIfSandwichAttack(&aLeg, &target, &bLeg)
+		}
 
 		isDex, isObs := s.di.CheckIfObsTx(tx, receipt.Logs, *tx.To())
 		if isDex {

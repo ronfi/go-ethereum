@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/go-redis/redis"
+	"math/big"
 	"os"
 	"runtime"
 	"time"
@@ -179,7 +180,8 @@ func (r *RonArbiter) mainLoop() {
 				clientInit.Reset(ClientInitialInterval) // retry in 5 seconds
 			} else {
 				r.client = client
-				r.di = defi.NewInfo(r.client, r.mysql)
+				signer := types.MakeSigner(r.chainConfig, big.NewInt(17034870), 1681266455)
+				r.di = defi.NewInfo(r.client, r.mysql, signer)
 			}
 
 		case <-oracle.C:

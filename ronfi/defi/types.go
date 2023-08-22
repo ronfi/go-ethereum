@@ -3,6 +3,7 @@ package defi
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ronfi/db"
 	"math/big"
@@ -101,6 +102,7 @@ func (p PairInfo) Equals(s PairInfo) bool {
 type Info struct {
 	client *ethclient.Client
 	mysql  *db.Mysql
+	signer types.Signer
 
 	poolsInfo     map[common.Address]*PoolInfo
 	pairsInfo     map[common.Address]*PairInfo
@@ -156,4 +158,9 @@ func (p *SwapPairInfo) Reverse() *SwapPairInfo {
 		Liquidity:    p.Liquidity,
 		Dir:          dir,
 	}
+}
+
+type TxAndReceipt struct {
+	Tx      *types.Transaction
+	Receipt *types.Receipt
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
@@ -31,7 +32,7 @@ var (
 	UniSwapStandardSwapMethod = crypto.Keccak256([]byte("swap(uint256,uint256,address,bytes)"))[:4]
 )
 
-func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
+func NewInfo(client *ethclient.Client, mysql *db.Mysql, signer types.Signer) *Info {
 	poolsInfo := make(map[common.Address]*PoolInfo)
 	pairsInfo := make(map[common.Address]*PairInfo)
 	tokensInfo := make(map[common.Address]*TokenInfo)
@@ -83,6 +84,7 @@ func NewInfo(client *ethclient.Client, mysql *db.Mysql) *Info {
 	return &Info{
 		client,
 		mysql,
+		signer,
 
 		poolsInfo,
 		pairsInfo,
@@ -506,4 +508,104 @@ func (di *Info) MergePairTokensInfo() {
 	}
 	di.newPoolsInfo = make(map[common.Address]*PoolInfo)
 	di.lock.Unlock()
+}
+
+func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int {
+	if aLeg == nil || target == nil || bLeg == nil {
+		return nil
+	}
+
+	aLegTx := aLeg.Tx
+	aLegReceipt := aLeg.Receipt
+	targetTx := target.Tx
+	targetReceipt := target.Receipt
+	bLegTx := bLeg.Tx
+	bLegReceipt := bLeg.Receipt
+
+	// check if txs valid
+	if aLegTx == nil || targetTx == nil || bLegTx == nil {
+		return nil
+	}
+
+	// check if all txs To are not nil
+	if aLegTx.To() == nil || targetTx.To() == nil || bLegTx.To() == nil {
+		return nil
+	}
+
+	// check if all txs are contract call txs
+	if len(aLegTx.Data()) == 0 || len(targetTx.Data()) == 0 || len(bLegTx.Data()) == 0 {
+		return nil
+	}
+
+	// check if all receipt valid
+	if aLegReceipt == nil || targetReceipt == nil || bLegReceipt == nil {
+		return nil
+	}
+
+	// check if all receipt status are success
+	if aLegReceipt.Status != types.ReceiptStatusSuccessful || targetReceipt.Status != types.ReceiptStatusSuccessful || bLegReceipt.Status != types.ReceiptStatusSuccessful {
+		return nil
+	}
+
+	// check if all receipt logs are not empty
+	if len(aLegReceipt.Logs) == 0 || len(targetReceipt.Logs) == 0 || len(bLegReceipt.Logs) == 0 {
+		return nil
+	}
+
+	// check aLeg sender equals bLeg sender
+	if aLegSender, _, err := types.RonFiSender(di.signer, aLegTx); err != nil {
+		return nil
+	} else {
+		if bLegSender, _, err := types.RonFiSender(di.signer, bLegTx); err != nil {
+			return nil
+		} else {
+			if aLegSender != bLegSender {
+				return nil
+			}
+		}
+	}
+
+	// extract swapInfos in all txs
+	aLegSwapInfos := di.ExtractSwapPairInfo(aLegTx, *aLegTx.To(), aLegReceipt.Logs, RonFiExtractTypeStats)
+	targetSwapInfos := di.ExtractSwapPairInfo(targetTx, *targetTx.To(), targetReceipt.Logs, RonFiExtractTypeStats)
+	bLegSwapInfos := di.ExtractSwapPairInfo(bLegTx, *bLegTx.To(), bLegReceipt.Logs, RonFiExtractTypeStats)
+
+	// check if all swapInfos valid
+	if len(aLegSwapInfos) == 0 || len(targetSwapInfos) == 0 || len(bLegSwapInfos) == 0 {
+		return nil
+	}
+
+	// check aLeg and target swapInfos are same
+	for _, aLegInfo := range aLegSwapInfos {
+		for _, targetInfo := range targetSwapInfos {
+			if aLegInfo.Address == targetInfo.Address && aLegInfo.Dir == targetInfo.Dir {
+				// check if bLeg has reversed swap
+				for _, bLegInfo := range bLegSwapInfos {
+					if bLegInfo.Address == aLegInfo.Address && bLegInfo.Dir != aLegInfo.Dir {
+						// sandwich attack found
+						aLegAmount := aLegInfo.AmountIn
+						bLegAmount := bLegInfo.AmountOut
+						if bLegAmount.Cmp(bLegAmount) > 0 {
+							profit := new(big.Int).Sub(bLegAmount, aLegAmount)
+							if _, ok := rcommon.TradableTokens[aLegInfo.TokenIn]; ok {
+								if tokenInfo := di.GetTokenInfo(aLegInfo.TokenIn); tokenInfo != nil {
+									profitInFloat := rcommon.TokenToFloat(profit, tokenInfo.Decimals)
+									if tokenPrice := GetTokenPrice(aLegInfo.TokenIn); tokenPrice > 0 {
+										profitInUSD := tokenPrice * profitInFloat
+										log.Info("RonFi Defi Sandwich Attack Found",
+											"aLeg", aLegTx.Hash().String(),
+											"target", targetTx.Hash().String(),
+											"bLeg", bLegTx.Hash().String(),
+											"profit", profitInUSD, "token", tokenInfo.Symbol)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
