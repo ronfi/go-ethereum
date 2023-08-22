@@ -141,6 +141,8 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 		}
 	}()
 
+	InitRonFiOracle(client)
+
 	conf := rcommon.MysqlConfig{
 		DbHost: "176.9.120.196",
 		DbPort: "3306",
@@ -168,7 +170,7 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 	// a: 0xc36a5c1ae3c869e6c5dda5b0f9cf949c8c2bfacf73f3a1fcf3df3fec77fd54ba
 	// t: 0x34549b17a9e3e4f9ffb0021f45d3ddfa0f5e6d8499fce954778a84e5615a1b11
 	// b: 0xe659554ef79d1b13aa99e5af830437c45b3f2d89f134b2cb6c55eb843ab6f912
-	aLegTxHash := common.HexToHash("0xc36a5c1ae3c869e6c5dda5b0f9cf949c8c2bfacf73f3a1fcf3df3fec77fd54ba")
+	aLegTxHash := common.HexToHash("0x59f0dd5939a2682bd0664610c9693d5fd0ea33bc06f5adbc76d7081dfe9c7bde")
 	if aLegTx, _, err := client.TransactionByHash(context.Background(), aLegTxHash); err == nil {
 		if aLegReceipt, err := client.TransactionReceipt(context.Background(), aLegTxHash); err == nil {
 			aLeg := &TxAndReceipt{
@@ -176,7 +178,7 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 				Receipt: aLegReceipt,
 			}
 
-			targetTxhash := common.HexToHash("0x34549b17a9e3e4f9ffb0021f45d3ddfa0f5e6d8499fce954778a84e5615a1b11")
+			targetTxhash := common.HexToHash("0xc03dfc0d55b64cd554947c2a42ae0b60076eeb9677bf6e5d83e19853e5772f85")
 			if targetTx, _, err := client.TransactionByHash(context.Background(), targetTxhash); err == nil {
 				if targetReceipt, err := client.TransactionReceipt(context.Background(), targetTxhash); err == nil {
 					target := &TxAndReceipt{
@@ -184,7 +186,7 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 						Receipt: targetReceipt,
 					}
 
-					bLegTxhash := common.HexToHash("0xe659554ef79d1b13aa99e5af830437c45b3f2d89f134b2cb6c55eb843ab6f912")
+					bLegTxhash := common.HexToHash("0xf2162a71f51b002631cd53a9e58d8e071a4f6a6ae97184d457e98547b8ad0928")
 					if bLegTx, _, err := client.TransactionByHash(context.Background(), bLegTxhash); err == nil {
 						if bLegReceipt, err := client.TransactionReceipt(context.Background(), bLegTxhash); err == nil {
 							bLeg := &TxAndReceipt{
