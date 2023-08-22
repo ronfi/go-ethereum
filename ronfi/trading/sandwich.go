@@ -187,7 +187,7 @@ func (s *RonSandwich) optimize(pool *defi.SwapPairInfo, amountIn *big.Int) bool 
 		if len(payloads) > 0 {
 			// create tx and apply
 			nonce := appState.GetNonce(s.execAddress)
-			if frontRunTx := s.buildExecuteTx(pool, payloads, false, false, nonce, s.worker.gasPrice); frontRunTx != nil {
+			if frontRunTx := s.buildExecuteTx(pool, payloads, true, true, nonce, s.worker.gasPrice); frontRunTx != nil {
 				if applySuccess, reverted, _, _ = s.worker.applyTransaction(frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState); applySuccess && !reverted {
 					targetTxHash := ronFiTxHash(s.targetTx.Hash())
 					if applySuccess, reverted, _, _ = s.worker.applyTransaction(s.targetTx, targetTxHash, appState); applySuccess && !reverted {
