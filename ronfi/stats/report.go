@@ -66,6 +66,13 @@ func (s *Stats) report(header *types.Header) {
 	}()
 
 	for i, tx := range blockTxs {
+		var (
+			swAttacker common.Address
+			swProfit   float64
+			swFound    bool
+			swTarget   *types.Transaction
+		)
+
 		to := tx.To()
 		if to == nil {
 			continue
@@ -104,94 +111,103 @@ func (s *Stats) report(header *types.Header) {
 				Tx:      tx,
 				Receipt: receipt,
 			}
-			s.di.CheckIfSandwichAttack(&aLeg, &target, &bLeg)
+			if attacker, profit, sandwich := s.di.CheckIfSandwichAttack(&aLeg, &target, &bLeg); sandwich {
+				swAttacker = attacker
+				swProfit = profit
+				swFound = true
+				swTarget = target.Tx
+			}
 		}
 
-		isDex, isObs := s.di.CheckIfObsTx(tx, receipt.Logs, *tx.To())
-		if isDex {
-			if receipt.Status == 1 {
-				var token common.Address
-				amountF := 0.0
-				found := false
-				for _, receiptLog := range receipt.Logs {
-					if len(receiptLog.Topics) > 0 && receiptLog.Topics[0] == state.TokenTransferEvent {
-						token = receiptLog.Address
-						if tInfo := s.di.GetTokenInfo(token); tInfo != nil {
-							if len(receiptLog.Data) != 32 {
-								continue
+		if swFound {
+			s.sandwichReport(swAttacker, swTarget, swProfit)
+		} else {
+			isDex, isObs := s.di.CheckIfObsTx(tx, receipt.Logs, *tx.To())
+			if isDex {
+				if receipt.Status == 1 {
+					var token common.Address
+					amountF := 0.0
+					found := false
+					for _, receiptLog := range receipt.Logs {
+						if len(receiptLog.Topics) > 0 && receiptLog.Topics[0] == state.TokenTransferEvent {
+							token = receiptLog.Address
+							if tInfo := s.di.GetTokenInfo(token); tInfo != nil {
+								if len(receiptLog.Data) != 32 {
+									continue
+								}
+								amount := new(big.Int).SetBytes(receiptLog.Data[:32])
+								amountF = rcommon.ToFloat(amount, tInfo.Decimals)
+								found = true
+								break //todo: check the wrong logic here! why break? missed stats for other transferred tokens in this tx.
 							}
-							amount := new(big.Int).SetBytes(receiptLog.Data[:32])
-							amountF = rcommon.ToFloat(amount, tInfo.Decimals)
-							found = true
-							break //todo: check the wrong logic here! why break? missed stats for other transferred tokens in this tx.
+						} else {
+							continue
 						}
-					} else {
+					}
+
+					if found {
+						swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypeStats)
+						if len(swapPairsInfo) > 0 {
+							// stats dex volume
+							v, exist := s.dexTokensVol[token]
+							if !exist {
+								s.dexTokensVol[token] = v
+							} else {
+								s.dexTokensVol[token] = v + amountF
+							}
+
+							amountInUSD := defi.GetAmountInUSD(amountF, token) //todo: check what happen if this token is not in my limited list?
+							for _, pair := range swapPairsInfo {
+								old, ok := s.dexPairsVol[pair.Address]
+								if !ok {
+									s.dexPairsVol[pair.Address] = amountInUSD
+								} else {
+									s.dexPairsVol[pair.Address] = old + amountInUSD
+								}
+							}
+						}
+					}
+				}
+
+				if !rpc.AllIngressTxs.Has(shortHash) {
+					// found missed dex txs from open tx pool
+					s.missedTxCount++
+					txLookup := bc.GetTransactionLookup(tx.Hash())
+					if txLookup == nil || txLookup.BlockHash != block.Hash() {
+						// maybe chain reorg
 						continue
 					}
+					log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
+				}
+			} else if isObs {
+				from, _ := types.Sender(signer, tx)
+				number := block.NumberU64()
+
+				var obsId ObsId
+				switch *to {
+				case Obs1SwapAddr:
+					obsId = Obs1
+				case Obs2SwapAddr:
+					obsId = Obs2
+				case Obs3SwapAddr:
+					obsId = Obs3
+				case Obs4SwapAddr:
+					obsId = Obs4
+				case Obs5SwapAddr:
+					obsId = Obs5
+				default:
+					obsId = Obsx
 				}
 
-				if found {
-					swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), receipt.Logs, defi.RonFiExtractTypeStats)
-					if len(swapPairsInfo) > 0 {
-						// stats dex volume
-						v, exist := s.dexTokensVol[token]
-						if !exist {
-							s.dexTokensVol[token] = v
-						} else {
-							s.dexTokensVol[token] = v + amountF
-						}
-
-						amountInUSD := defi.GetAmountInUSD(amountF, token) //todo: check what happen if this token is not in my limited list?
-						for _, pair := range swapPairsInfo {
-							old, ok := s.dexPairsVol[pair.Address]
-							if !ok {
-								s.dexPairsVol[pair.Address] = amountInUSD
-							} else {
-								s.dexPairsVol[pair.Address] = old + amountInUSD
-							}
-						}
+				// check obs method
+				if obsId == Obsx {
+					switch methodID {
+					case Obs6Method:
+						obsId = Obs6
 					}
 				}
+				s.obsReport(obsId, number, tx, from, tx.Hash().String(), methodID, data, receipt)
 			}
-
-			if !rpc.AllIngressTxs.Has(shortHash) {
-				// found missed dex txs from open tx pool
-				s.missedTxCount++
-				txLookup := bc.GetTransactionLookup(tx.Hash())
-				if txLookup == nil || txLookup.BlockHash != block.Hash() {
-					// maybe chain reorg
-					continue
-				}
-				log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
-			}
-		} else if isObs {
-			from, _ := types.Sender(signer, tx)
-			number := block.NumberU64()
-
-			var obsId ObsId
-			switch *to {
-			case Obs1SwapAddr:
-				obsId = Obs1
-			case Obs2SwapAddr:
-				obsId = Obs2
-			case Obs3SwapAddr:
-				obsId = Obs3
-			case Obs4SwapAddr:
-				obsId = Obs4
-			case Obs5SwapAddr:
-				obsId = Obs5
-			default:
-				obsId = Obsx
-			}
-
-			// check obs method
-			if obsId == Obsx {
-				switch methodID {
-				case Obs6Method:
-					obsId = Obs6
-				}
-			}
-			s.obsReport(obsId, number, tx, from, tx.Hash().String(), methodID, data, receipt)
 		}
 	}
 
@@ -473,6 +489,34 @@ func (s *Stats) pairStatsReport() {
 			}
 		}
 	}
+}
+
+func (s *Stats) sandwichReport(attacker common.Address, target *types.Transaction, profit float64) {
+	if attacker == (common.Address{}) || target == nil {
+		return
+	}
+
+	if profitAll, ok := s.swStats[attacker]; ok {
+		s.swStats[attacker] = profitAll + profit
+	} else {
+		s.swStats[attacker] = profit
+	}
+
+	log.Warn("RonFi sandwich attack", "target", target.Hash().String(), "attacker", attacker.String(), "profit", rcommon.Float2Str(profit, 3))
+}
+
+func (s *Stats) sandwichProfitReport() {
+	if len(s.swStats) == 0 {
+		log.Warn("RonFi sandwich attack", "no attack found")
+		return
+	}
+
+	totalProfit := 0.0
+	for attacker, profit := range s.swStats {
+		log.Warn("RonFi sandwich attack", "attacker", attacker.String(), "profit", rcommon.Float2Str(profit, 3))
+		totalProfit += profit
+	}
+	log.Warn("RonFi sandwich attack", "totalProfit", rcommon.Float2Str(totalProfit, 3))
 }
 
 func (s *Stats) dexVolumeReport() {

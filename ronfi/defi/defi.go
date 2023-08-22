@@ -510,9 +510,11 @@ func (di *Info) MergePairTokensInfo() {
 	di.lock.Unlock()
 }
 
-func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int {
+func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) (common.Address, float64, bool) {
+	var attacker common.Address
+
 	if aLeg == nil || target == nil || bLeg == nil {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	aLegTx := aLeg.Tx
@@ -524,43 +526,45 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int
 
 	// check if txs valid
 	if aLegTx == nil || targetTx == nil || bLegTx == nil {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check if all txs To are not nil
 	if aLegTx.To() == nil || targetTx.To() == nil || bLegTx.To() == nil {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check if all txs are contract call txs
 	if len(aLegTx.Data()) == 0 || len(targetTx.Data()) == 0 || len(bLegTx.Data()) == 0 {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check if all receipt valid
 	if aLegReceipt == nil || targetReceipt == nil || bLegReceipt == nil {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check if all receipt status are success
 	if aLegReceipt.Status != types.ReceiptStatusSuccessful || targetReceipt.Status != types.ReceiptStatusSuccessful || bLegReceipt.Status != types.ReceiptStatusSuccessful {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check if all receipt logs are not empty
 	if len(aLegReceipt.Logs) == 0 || len(targetReceipt.Logs) == 0 || len(bLegReceipt.Logs) == 0 {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check aLeg sender equals bLeg sender
 	if aLegSender, _, err := types.RonFiSender(di.signer, aLegTx); err != nil {
-		return nil
+		return attacker, 0.0, false
 	} else {
 		if bLegSender, _, err := types.RonFiSender(di.signer, bLegTx); err != nil {
-			return nil
+			return attacker, 0.0, false
 		} else {
 			if aLegSender != bLegSender {
-				return nil
+				return attacker, 0.0, false
+			} else {
+				attacker = aLegSender
 			}
 		}
 	}
@@ -572,7 +576,7 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int
 
 	// check if all swapInfos valid
 	if len(aLegSwapInfos) == 0 || len(targetSwapInfos) == 0 || len(bLegSwapInfos) == 0 {
-		return nil
+		return attacker, 0.0, false
 	}
 
 	// check aLeg and target swapInfos are same
@@ -592,11 +596,7 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int
 									profitInFloat := rcommon.TokenToFloat(profit, tokenInfo.Decimals)
 									if tokenPrice := GetTokenPrice(aLegInfo.TokenIn); tokenPrice > 0 {
 										profitInUSD := tokenPrice * profitInFloat
-										log.Info("RonFi Defi Sandwich Attack Found",
-											"aLeg", aLegTx.Hash().String(),
-											"target", targetTx.Hash().String(),
-											"bLeg", bLegTx.Hash().String(),
-											"profit", profitInUSD, "token", tokenInfo.Symbol)
+										return attacker, profitInUSD, true
 									}
 								}
 							}
@@ -607,5 +607,5 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) *big.Int
 		}
 	}
 
-	return nil
+	return attacker, 0.0, false
 }
