@@ -529,7 +529,7 @@ func (s *Stats) sandwichReport(attacker common.Address, target *types.Transactio
 
 func (s *Stats) sandwichProfitReport() {
 	if len(s.swStats) == 0 {
-		log.Warn("RonFi sandwich attack", "no attack found")
+		log.Warn("RonFi sandwich attack no attack found!")
 		return
 	}
 
