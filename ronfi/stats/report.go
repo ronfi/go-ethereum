@@ -335,7 +335,7 @@ func (s *Stats) obsReport(
 		}
 		allRatio := s.obsStats.ratio(id)
 		profit, v3Hunting, isArbTx := s.di.GetArbTxProfit(tx, receipt.Logs, *tx.To())
-		if !isArbTx {
+		if !isArbTx || profit < 0 {
 			return
 		}
 
