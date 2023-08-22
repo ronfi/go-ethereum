@@ -579,24 +579,79 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) (common.
 		return attacker, 0.0, false
 	}
 
-	// check aLeg and target swapInfos are same
-	for _, aLegInfo := range aLegSwapInfos {
-		for _, targetInfo := range targetSwapInfos {
+	// case 1: aLeg and bLeg are both normal swap txs; then profit = bLegAmount - aLegAmount
+	// case 2: aLeg is normal swap tx, bLeg is a reversed swap + arb loop; then profit = bLegAmount - aLegAmount + arbProfit
+	// case 3: aLeg and bLeg are both arb loop txs; then profit = bLegProfit + aLegProfit(negative)
+	for _, targetInfo := range targetSwapInfos {
+		for _, aLegInfo := range aLegSwapInfos {
 			if aLegInfo.Address == targetInfo.Address && aLegInfo.Dir == targetInfo.Dir {
 				// check if bLeg has reversed swap
 				for _, bLegInfo := range bLegSwapInfos {
 					if bLegInfo.Address == aLegInfo.Address && bLegInfo.Dir != aLegInfo.Dir {
-						// sandwich attack found
-						aLegAmount := aLegInfo.AmountIn
-						bLegAmount := bLegInfo.AmountOut
-						if bLegAmount.Cmp(aLegAmount) > 0 {
-							profit := new(big.Int).Sub(bLegAmount, aLegAmount)
-							if _, ok := rcommon.TradableTokens[aLegInfo.TokenIn]; ok {
-								if tokenInfo := di.GetTokenInfo(aLegInfo.TokenIn); tokenInfo != nil {
-									profitInFloat := rcommon.TokenToFloat(profit, tokenInfo.Decimals)
-									if tokenPrice := GetTokenPrice(aLegInfo.TokenIn); tokenPrice > 0 {
-										profitInUSD := tokenPrice * profitInFloat
-										return attacker, profitInUSD, true
+						// check if aLeg/bLeg in loop mode
+						aLegProfit := 0.0
+						if _, isObs := di.CheckIfObsTx(aLegTx, aLegReceipt.Logs, *aLegTx.To()); !isObs {
+							// case 1
+							aLegAmount := aLegInfo.AmountIn
+
+							// check if bLeg a normal swap or contains arb loop
+							if _, isObs := di.CheckIfObsTx(bLegTx, bLegReceipt.Logs, *bLegTx.To()); !isObs {
+								// case 1
+								bLegAmount := bLegInfo.AmountOut
+								if bLegAmount.Cmp(aLegAmount) > 0 {
+									profit := new(big.Int).Sub(bLegAmount, aLegAmount)
+									if _, ok := rcommon.TradableTokens[aLegInfo.TokenIn]; ok {
+										if tokenInfo := di.GetTokenInfo(aLegInfo.TokenIn); tokenInfo != nil {
+											profitInFloat := rcommon.TokenToFloat(profit, tokenInfo.Decimals)
+											if tokenPrice := GetTokenPrice(aLegInfo.TokenIn); tokenPrice > 0 {
+												profitInUSD := tokenPrice * profitInFloat
+												return attacker, profitInUSD, true
+											}
+										}
+									}
+								}
+							} else {
+								// case 2
+								// step1: get sandwich profit
+								totalProfit := 0.0
+								bLegAmount := bLegInfo.AmountOut
+								if bLegAmount.Cmp(aLegAmount) > 0 {
+									profit := new(big.Int).Sub(bLegAmount, aLegAmount)
+									if _, ok := rcommon.TradableTokens[aLegInfo.TokenIn]; ok {
+										if tokenInfo := di.GetTokenInfo(aLegInfo.TokenIn); tokenInfo != nil {
+											profitInFloat := rcommon.TokenToFloat(profit, tokenInfo.Decimals)
+											if tokenPrice := GetTokenPrice(aLegInfo.TokenIn); tokenPrice > 0 {
+												profitInUSD := tokenPrice * profitInFloat
+												totalProfit += profitInUSD
+											}
+										}
+									}
+								}
+
+								// step2: get arb profit
+								if profit, _, isArbTx := di.GetArbTxProfit(aLegTx, aLegReceipt.Logs, *aLegTx.To()); isArbTx {
+									totalProfit += profit
+									return attacker, totalProfit, true
+								}
+							}
+						} else {
+							// case 3
+							if profit, _, isArb := di.GetArbTxProfit(aLegTx, aLegReceipt.Logs, *aLegTx.To()); isArb {
+								aLegProfit = profit
+								if aLegProfit > 0 {
+									log.Warn("RonFi Defi sandwich attack found", "aLegProfit", aLegProfit, "aLegTx", aLegTx.Hash().Hex(), "bLegTx", bLegTx.Hash().Hex())
+									return attacker, 0.0, false
+								} else {
+									// then check bLeg
+									bLegProfit := 0.0
+									if _, isObs := di.CheckIfObsTx(bLegTx, bLegReceipt.Logs, *bLegTx.To()); isObs {
+										if profit, _, isArb := di.GetArbTxProfit(bLegTx, bLegReceipt.Logs, *bLegTx.To()); isArb {
+											bLegProfit = profit
+											netProfit := bLegProfit + aLegProfit
+											if netProfit > 0 {
+												return attacker, 0.0, false
+											}
+										}
 									}
 								}
 							}

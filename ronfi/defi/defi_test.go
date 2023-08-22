@@ -159,7 +159,16 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 	signer := types.MakeSigner(config, big.NewInt(17034870), 1681266455)
 	info := NewInfo(client, dbInst, signer)
 
-	aLegTxHash := common.HexToHash("0x88d834c48c5116250e84c1f2257a108d827fd0106fc57d1e139a5eae53833bf1")
+	// case 1: normal swap in aleg/bleg
+	//a: 0x88d834c48c5116250e84c1f2257a108d827fd0106fc57d1e139a5eae53833bf1
+	//t: 0x9eca86325196b80097401d5417ecfee2b6acd4aee04d895993f61587c91e6d7c
+	//b: 0x9b64b58b5b16bafc16b5d8029fd63432136c73fd6d5526052209ee304d417d84
+
+	// case 2: loop in aleg/bleg
+	// a: 0xc36a5c1ae3c869e6c5dda5b0f9cf949c8c2bfacf73f3a1fcf3df3fec77fd54ba
+	// t: 0x34549b17a9e3e4f9ffb0021f45d3ddfa0f5e6d8499fce954778a84e5615a1b11
+	// b: 0xe659554ef79d1b13aa99e5af830437c45b3f2d89f134b2cb6c55eb843ab6f912
+	aLegTxHash := common.HexToHash("0xc36a5c1ae3c869e6c5dda5b0f9cf949c8c2bfacf73f3a1fcf3df3fec77fd54ba")
 	if aLegTx, _, err := client.TransactionByHash(context.Background(), aLegTxHash); err == nil {
 		if aLegReceipt, err := client.TransactionReceipt(context.Background(), aLegTxHash); err == nil {
 			aLeg := &TxAndReceipt{
@@ -167,7 +176,7 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 				Receipt: aLegReceipt,
 			}
 
-			targetTxhash := common.HexToHash("0x9eca86325196b80097401d5417ecfee2b6acd4aee04d895993f61587c91e6d7c")
+			targetTxhash := common.HexToHash("0x34549b17a9e3e4f9ffb0021f45d3ddfa0f5e6d8499fce954778a84e5615a1b11")
 			if targetTx, _, err := client.TransactionByHash(context.Background(), targetTxhash); err == nil {
 				if targetReceipt, err := client.TransactionReceipt(context.Background(), targetTxhash); err == nil {
 					target := &TxAndReceipt{
@@ -175,7 +184,7 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 						Receipt: targetReceipt,
 					}
 
-					bLegTxhash := common.HexToHash("0x9b64b58b5b16bafc16b5d8029fd63432136c73fd6d5526052209ee304d417d84")
+					bLegTxhash := common.HexToHash("0xe659554ef79d1b13aa99e5af830437c45b3f2d89f134b2cb6c55eb843ab6f912")
 					if bLegTx, _, err := client.TransactionByHash(context.Background(), bLegTxhash); err == nil {
 						if bLegReceipt, err := client.TransactionReceipt(context.Background(), bLegTxhash); err == nil {
 							bLeg := &TxAndReceipt{
@@ -183,7 +192,11 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 								Receipt: bLegReceipt,
 							}
 
-							info.CheckIfSandwichAttack(aLeg, target, bLeg)
+							if attacker, profit, ok := info.CheckIfSandwichAttack(aLeg, target, bLeg); ok {
+								t.Logf("TestInfo_CheckIfSandwichAttack attacker: %v, profit: %v", attacker, profit)
+							} else {
+								t.Fatal("TestInfo_CheckIfSandwichAttack CheckIfSandwichAttack failed!")
+							}
 						}
 					}
 				}
