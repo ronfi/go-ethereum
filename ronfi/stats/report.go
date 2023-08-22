@@ -28,6 +28,13 @@ type DexPairInfo struct {
 	token1  defi.TokenInfo
 }
 
+type SandWichAttackerStats struct {
+	pfPrivate float64
+	pfPublic  float64
+	prvTxs    uint64
+	pubTxs    uint64
+}
+
 const maxLenCheckSum = 256 // Circular Buffer for Input Data Checksum
 var (
 	PrevBlockTxs int
@@ -120,7 +127,7 @@ func (s *Stats) report(header *types.Header) {
 		}
 
 		if swFound {
-			s.sandwichReport(swAttacker, swTarget, swProfit)
+			s.sandwichReport(swAttacker, swTarget, swProfit, rpc.AllIngressTxs.Has(swTarget.Hash().Uint64()))
 		} else {
 			isDex, isObs := s.di.CheckIfObsTx(tx, receipt.Logs, *tx.To())
 			if isDex {
@@ -491,15 +498,30 @@ func (s *Stats) pairStatsReport() {
 	}
 }
 
-func (s *Stats) sandwichReport(attacker common.Address, target *types.Transaction, profit float64) {
+func (s *Stats) sandwichReport(attacker common.Address, target *types.Transaction, profit float64, public bool) {
 	if attacker == (common.Address{}) || target == nil {
 		return
 	}
 
-	if profitAll, ok := s.swStats[attacker]; ok {
-		s.swStats[attacker] = profitAll + profit
+	if info, ok := s.swStats[attacker]; ok {
+		if public {
+			info.pubTxs++
+			info.pfPublic += profit
+		} else {
+			info.prvTxs++
+			info.pfPrivate += profit
+		}
 	} else {
-		s.swStats[attacker] = profit
+		swInfo := &SandWichAttackerStats{}
+		if public {
+			swInfo.pubTxs++
+			swInfo.pfPublic += profit
+		} else {
+			swInfo.prvTxs++
+			swInfo.pfPrivate += profit
+		}
+
+		s.swStats[attacker] = swInfo
 	}
 
 	log.Warn("RonFi sandwich attack", "target", target.Hash().String(), "attacker", attacker.String(), "profit", rcommon.Float2Str(profit, 3))
@@ -511,12 +533,23 @@ func (s *Stats) sandwichProfitReport() {
 		return
 	}
 
-	totalProfit := 0.0
-	for attacker, profit := range s.swStats {
+	totalPrivProfit := 0.0
+	totalPubProfit := 0.0
+	privTxs := uint64(0)
+	pubTxs := uint64(0)
+	for attacker, info := range s.swStats {
+		profit := info.pfPrivate + info.pfPublic
 		log.Warn("RonFi sandwich attack", "attacker", attacker.String(), "profit", rcommon.Float2Str(profit, 3))
-		totalProfit += profit
+		totalPrivProfit += info.pfPrivate
+		totalPubProfit += info.pfPublic
+		privTxs += info.prvTxs
+		pubTxs += info.pubTxs
 	}
-	log.Warn("RonFi sandwich attack", "totalProfit", rcommon.Float2Str(totalProfit, 3))
+	log.Warn("RonFi sandwich attack",
+		"public txs", pubTxs,
+		"public profit", rcommon.Float2Str(totalPubProfit, 3),
+		"private txs", privTxs,
+		"private profit", rcommon.Float2Str(totalPrivProfit, 3))
 }
 
 func (s *Stats) dexVolumeReport() {

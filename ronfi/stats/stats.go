@@ -66,7 +66,7 @@ type Stats struct {
 	obsStats     ObsAllStatsMap
 	obsPairStats ObsAllPairStatsMap
 	loopsCol     *LoopsCollector
-	swStats      map[common.Address]float64
+	swStats      map[common.Address]*SandWichAttackerStats
 
 	pairMaxGasUsed  map[string]uint64
 	dexPairs        map[common.Address]uint64
@@ -145,7 +145,7 @@ func NewStats(
 	s.obsPairStats.init()
 	s.obsStats = make(ObsAllStatsMap)
 	s.obsStats.init()
-	s.swStats = make(map[common.Address]float64)
+	s.swStats = make(map[common.Address]*SandWichAttackerStats)
 
 	s.loopsCol = NewLoopsCollector(redis, mysql)
 	s.loopsCol.start()
