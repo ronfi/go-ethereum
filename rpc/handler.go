@@ -37,7 +37,6 @@ const (
 
 var (
 	StartTrading  = false
-	LogPairGas    = false
 	LogPairUse    = false
 	FilterDupTxs  = true
 	LogSkipReason = false
@@ -464,9 +463,6 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
 		return msg.response("ok")
 	case "logPairUse":
 		LogPairUse = true
-		return msg.response("ok")
-	case "logPairGas":
-		LogPairGas = true
 		return msg.response("ok")
 	case "logSkipReason":
 		LogSkipReason = !LogSkipReason

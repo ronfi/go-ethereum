@@ -234,16 +234,6 @@ func (s *Stats) report(header *types.Header) {
 
 			s.pairStatsReport()
 		}
-
-		if rpc.LogPairGas {
-			rpc.LogPairGas = false
-
-			log.Info("RonFi log pair gasUsed", "initial", s.initialPairGasMapSize, "new", len(s.pairMaxGasUsed)-s.initialPairGasMapSize)
-			go func() {
-				s.mysql.UpdatePairGas(s.pairMaxGasUsed)
-				s.mysql.UpdateDexPairs(s.dexPairs)
-			}()
-		}
 	}
 }
 
