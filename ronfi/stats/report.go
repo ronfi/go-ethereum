@@ -29,10 +29,10 @@ type DexPairInfo struct {
 }
 
 type SandWichAttackerStats struct {
-	pfPrivate float64
-	pfPublic  float64
-	prvTxs    uint64
-	pubTxs    uint64
+	attacker  common.Address
+	profit    float64
+	netProfit float64
+	txs       uint64
 }
 
 const maxLenCheckSum = 256 // Circular Buffer for Input Data Checksum
@@ -74,10 +74,10 @@ func (s *Stats) report(header *types.Header) {
 
 	for i, tx := range blockTxs {
 		var (
-			swAttacker common.Address
-			swProfit   float64
-			swFound    bool
-			swTarget   *types.Transaction
+			swAttacker            common.Address
+			swProfit, swNetProfit float64
+			swFound               bool
+			swTarget              *types.Transaction
 		)
 
 		to := tx.To()
@@ -118,16 +118,17 @@ func (s *Stats) report(header *types.Header) {
 				Tx:      tx,
 				Receipt: receipt,
 			}
-			if attacker, profit, sandwich := s.di.CheckIfSandwichAttack(&aLeg, &target, &bLeg); sandwich {
+			if attacker, profit, netProfit, sandwich := s.di.CheckIfSandwichAttack(&aLeg, &target, &bLeg); sandwich {
 				swAttacker = attacker
 				swProfit = profit
+				swNetProfit = netProfit
 				swFound = true
 				swTarget = target.Tx
 			}
 		}
 
 		if swFound {
-			s.sandwichReport(swAttacker, swTarget, swProfit, rpc.AllIngressTxs.Has(swTarget.Hash().Uint64()))
+			s.sandwichReport(swAttacker, swTarget, swProfit, swNetProfit)
 		} else {
 			isDex, isObs := s.di.CheckIfObsTx(tx, receipt.Logs, *tx.To())
 			if isDex {
@@ -488,33 +489,29 @@ func (s *Stats) pairStatsReport() {
 	}
 }
 
-func (s *Stats) sandwichReport(attacker common.Address, target *types.Transaction, profit float64, public bool) {
+func (s *Stats) sandwichReport(attacker common.Address, target *types.Transaction, profit, netProfit float64) {
 	if attacker == (common.Address{}) || target == nil {
 		return
 	}
 
 	if info, ok := s.swStats[attacker]; ok {
-		if public {
-			info.pubTxs++
-			info.pfPublic += profit
-		} else {
-			info.prvTxs++
-			info.pfPrivate += profit
-		}
+		info.txs++
+		info.profit += profit
+		info.netProfit += netProfit
 	} else {
 		swInfo := &SandWichAttackerStats{}
-		if public {
-			swInfo.pubTxs++
-			swInfo.pfPublic += profit
-		} else {
-			swInfo.prvTxs++
-			swInfo.pfPrivate += profit
-		}
-
+		swInfo.attacker = attacker
+		swInfo.txs = 1
+		swInfo.profit = profit
+		swInfo.netProfit = netProfit
 		s.swStats[attacker] = swInfo
 	}
 
-	log.Warn("RonFi sandwich attack", "target", target.Hash().String(), "attacker", attacker.String(), "profit", rcommon.Float2Str(profit, 3))
+	log.Warn("RonFi sandwich attack",
+		"target", target.Hash().String(),
+		"attacker", attacker.String(),
+		"profit", rcommon.Float2Str(profit, 3),
+		"netProfit", rcommon.Float2Str(netProfit, 3))
 }
 
 func (s *Stats) sandwichProfitReport() {
@@ -523,23 +520,34 @@ func (s *Stats) sandwichProfitReport() {
 		return
 	}
 
-	totalPrivProfit := 0.0
-	totalPubProfit := 0.0
-	privTxs := uint64(0)
-	pubTxs := uint64(0)
-	for attacker, info := range s.swStats {
-		profit := info.pfPrivate + info.pfPublic
-		log.Warn("RonFi sandwich attack", "attacker", attacker.String(), "profit", rcommon.Float2Str(profit, 3))
-		totalPrivProfit += info.pfPrivate
-		totalPubProfit += info.pfPublic
-		privTxs += info.prvTxs
-		pubTxs += info.pubTxs
+	totalProfit := 0.0
+	totalNetProfit := 0.0
+	totalTxs := uint64(0)
+
+	var infos []*SandWichAttackerStats
+	for _, info := range s.swStats {
+		infos = append(infos, info)
 	}
+
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].profit > infos[j].profit
+	})
+
+	for _, info := range infos {
+		log.Warn("RonFi sandwich attack",
+			"attacker", info.attacker.String(),
+			"profit", rcommon.Float2Str(info.profit, 3),
+			"netProfit", rcommon.Float2Str(info.netProfit, 3),
+			"txs", info.txs)
+		totalProfit += info.profit
+		totalNetProfit += info.netProfit
+		totalTxs += info.txs
+	}
+
 	log.Warn("RonFi sandwich attack",
-		"public txs", pubTxs,
-		"public profit", rcommon.Float2Str(totalPubProfit, 3),
-		"private txs", privTxs,
-		"private profit", rcommon.Float2Str(totalPrivProfit, 3))
+		"total profit", rcommon.Float2Str(totalProfit, 3),
+		"total net profit", rcommon.Float2Str(totalNetProfit, 3),
+		"total txs", totalTxs)
 }
 
 func (s *Stats) dexVolumeReport() {

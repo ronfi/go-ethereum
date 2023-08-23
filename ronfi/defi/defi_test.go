@@ -194,8 +194,8 @@ func TestInfo_CheckIfSandwichAttack(t *testing.T) {
 								Receipt: bLegReceipt,
 							}
 
-							if attacker, profit, ok := info.CheckIfSandwichAttack(aLeg, target, bLeg); ok {
-								t.Logf("TestInfo_CheckIfSandwichAttack attacker: %v, profit: %v", attacker, profit)
+							if attacker, profit, netProfit, ok := info.CheckIfSandwichAttack(aLeg, target, bLeg); ok {
+								t.Logf("TestInfo_CheckIfSandwichAttack attacker: %v, profit: %v, netProfit: %v", attacker, profit, netProfit)
 							} else {
 								t.Fatal("TestInfo_CheckIfSandwichAttack CheckIfSandwichAttack failed!")
 							}
