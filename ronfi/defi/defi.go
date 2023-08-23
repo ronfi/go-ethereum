@@ -555,19 +555,19 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) (common.
 	}
 
 	// check aLeg sender equals bLeg sender
-	//if aLegSender, _, err := types.RonFiSender(di.signer, aLegTx); err != nil {
-	//	return attacker, 0.0, false
-	//} else {
-	//	if bLegSender, _, err := types.RonFiSender(di.signer, bLegTx); err != nil {
-	//		return attacker, 0.0, false
-	//	} else {
-	//		if aLegSender != bLegSender {
-	//			return attacker, 0.0, false
-	//		} else {
-	//			attacker = aLegSender
-	//		}
-	//	}
-	//}
+	if aLegSender, _, err := types.RonFiSender(di.signer, aLegTx); err != nil {
+		return attacker, 0.0, false
+	} else {
+		if bLegSender, _, err := types.RonFiSender(di.signer, bLegTx); err != nil {
+			return attacker, 0.0, false
+		} else {
+			if aLegSender != bLegSender {
+				return attacker, 0.0, false
+			} else {
+				attacker = aLegSender
+			}
+		}
+	}
 
 	// extract swapInfos in all txs
 	aLegSwapInfos := di.ExtractSwapPairInfo(aLegTx, *aLegTx.To(), aLegReceipt.Logs, RonFiExtractTypeStats)
