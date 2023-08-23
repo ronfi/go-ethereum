@@ -579,8 +579,8 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) (common.
 		return attacker, 0.0, 0.0, false
 	}
 
-	aLegTxFee := di.GetTransactionFee(aLegTx)
-	bLegTxFee := di.GetTransactionFee(bLegTx)
+	aLegTxFee := di.GetTransactionFee(aLegTx.GasPrice(), aLegReceipt.GasUsed)
+	bLegTxFee := di.GetTransactionFee(bLegTx.GasPrice(), bLegReceipt.GasUsed)
 
 	// case 1: aLeg and bLeg are both normal swap txs; then profit = bLegAmount - aLegAmount
 	// case 2: aLeg is normal swap tx, bLeg is a reversed swap + arb loop; then profit = bLegAmount - aLegAmount + arbProfit
@@ -673,8 +673,8 @@ func (di *Info) CheckIfSandwichAttack(aLeg, target, bLeg *TxAndReceipt) (common.
 	return attacker, 0.0, 0.0, false
 }
 
-func (di *Info) GetTransactionFee(tx *types.Transaction) float64 {
-	txFee := new(big.Int).Mul(tx.GasPrice(), big.NewInt(int64(tx.Gas())))
+func (di *Info) GetTransactionFee(gasPrice *big.Int, gasUsed uint64) float64 {
+	txFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	txFeeInFloat := rcommon.TokenToFloat(txFee, 18)
 	price := GetTradingTokenPrice(rcommon.WETH)
 	txFeeInFloat /= price
