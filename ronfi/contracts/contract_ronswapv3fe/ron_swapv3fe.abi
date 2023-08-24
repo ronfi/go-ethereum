@@ -88,46 +88,6 @@
   {
     "inputs": [
       {
-        "internalType": "bool",
-        "name": "isSandwich",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isALeg",
-        "type": "bool"
-      },
-      {
-        "components": [
-          {
-            "internalType": "address",
-            "name": "target",
-            "type": "address"
-          },
-          {
-            "internalType": "bytes",
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct RonSwapV3FE.Payload[]",
-        "name": "payloads",
-        "type": "tuple[]"
-      }
-    ],
-    "name": "executePayloads",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "sender",
         "type": "address"
@@ -179,6 +139,56 @@
   {
     "inputs": [
       {
+        "internalType": "bool",
+        "name": "isALeg",
+        "type": "bool"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "target",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct RonSwapV3FE.Payload[]",
+        "name": "payloads",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "tokenPairsAndFee",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amountIn",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "txFee",
+        "type": "uint256"
+      }
+    ],
+    "name": "ronSandwich",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256[]",
         "name": "tokenPairsAndFee",
         "type": "uint256[]"
@@ -197,19 +207,6 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "rate",
-        "type": "uint256"
-      }
-    ],
-    "name": "setFeeRate",
-    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },

@@ -37,7 +37,7 @@ type RonSwapV3FEPayload struct {
 
 // Ronswapv3feMetaData contains all meta data concerning the Ronswapv3fe contract.
 var Ronswapv3feMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"_charger\",\"type\":\"address\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"charger\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalOk\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"failed\",\"type\":\"bool\"}],\"name\":\"Deposited\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"addExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"delExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"isSandwich\",\"type\":\"bool\"},{\"internalType\":\"bool\",\"name\":\"isALeg\",\"type\":\"bool\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"internalType\":\"structRonSwapV3FE.Payload[]\",\"name\":\"payloads\",\"type\":\"tuple[]\"}],\"name\":\"executePayloads\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount0\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount1\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"pancakeCall\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"pancakeV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenPairsAndFee\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"amountIn\",\"type\":\"uint256\"}],\"name\":\"ronSwapV3\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"amountOut\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"}],\"name\":\"setFeeRate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount0\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount1\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"uniswapV2Call\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"uniswapV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"_charger\",\"type\":\"address\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"charger\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalOk\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"failed\",\"type\":\"bool\"}],\"name\":\"Deposited\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"addExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_executors\",\"type\":\"address[]\"}],\"name\":\"delExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount0\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount1\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"pancakeCall\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"pancakeV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"isALeg\",\"type\":\"bool\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"internalType\":\"structRonSwapV3FE.Payload[]\",\"name\":\"payloads\",\"type\":\"tuple[]\"},{\"internalType\":\"uint256[]\",\"name\":\"tokenPairsAndFee\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"amountIn\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"txFee\",\"type\":\"uint256\"}],\"name\":\"ronSandwich\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenPairsAndFee\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"amountIn\",\"type\":\"uint256\"}],\"name\":\"ronSwapV3\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"amountOut\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount0\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount1\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"uniswapV2Call\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"amount0\",\"type\":\"int256\"},{\"internalType\":\"int256\",\"name\":\"amount1\",\"type\":\"int256\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"uniswapV3SwapCallback\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
 }
 
 // Ronswapv3feABI is the input ABI used to generate the binding from.
@@ -249,27 +249,6 @@ func (_Ronswapv3fe *Ronswapv3feTransactorSession) Deposit(amount *big.Int) (*typ
 	return _Ronswapv3fe.Contract.Deposit(&_Ronswapv3fe.TransactOpts, amount)
 }
 
-// ExecutePayloads is a paid mutator transaction binding the contract method 0x18b41c6e.
-//
-// Solidity: function executePayloads(bool isSandwich, bool isALeg, (address,bytes,uint256)[] payloads) payable returns()
-func (_Ronswapv3fe *Ronswapv3feTransactor) ExecutePayloads(opts *bind.TransactOpts, isSandwich bool, isALeg bool, payloads []RonSwapV3FEPayload) (*types.Transaction, error) {
-	return _Ronswapv3fe.contract.Transact(opts, "executePayloads", isSandwich, isALeg, payloads)
-}
-
-// ExecutePayloads is a paid mutator transaction binding the contract method 0x18b41c6e.
-//
-// Solidity: function executePayloads(bool isSandwich, bool isALeg, (address,bytes,uint256)[] payloads) payable returns()
-func (_Ronswapv3fe *Ronswapv3feSession) ExecutePayloads(isSandwich bool, isALeg bool, payloads []RonSwapV3FEPayload) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.ExecutePayloads(&_Ronswapv3fe.TransactOpts, isSandwich, isALeg, payloads)
-}
-
-// ExecutePayloads is a paid mutator transaction binding the contract method 0x18b41c6e.
-//
-// Solidity: function executePayloads(bool isSandwich, bool isALeg, (address,bytes,uint256)[] payloads) payable returns()
-func (_Ronswapv3fe *Ronswapv3feTransactorSession) ExecutePayloads(isSandwich bool, isALeg bool, payloads []RonSwapV3FEPayload) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.ExecutePayloads(&_Ronswapv3fe.TransactOpts, isSandwich, isALeg, payloads)
-}
-
 // PancakeCall is a paid mutator transaction binding the contract method 0x84800812.
 //
 // Solidity: function pancakeCall(address sender, uint256 amount0, uint256 amount1, bytes _data) returns()
@@ -312,6 +291,27 @@ func (_Ronswapv3fe *Ronswapv3feTransactorSession) PancakeV3SwapCallback(amount0 
 	return _Ronswapv3fe.Contract.PancakeV3SwapCallback(&_Ronswapv3fe.TransactOpts, amount0, amount1, _data)
 }
 
+// RonSandwich is a paid mutator transaction binding the contract method 0x5801d473.
+//
+// Solidity: function ronSandwich(bool isALeg, (address,bytes,uint256)[] payloads, uint256[] tokenPairsAndFee, uint256 amountIn, uint256 txFee) payable returns()
+func (_Ronswapv3fe *Ronswapv3feTransactor) RonSandwich(opts *bind.TransactOpts, isALeg bool, payloads []RonSwapV3FEPayload, tokenPairsAndFee []*big.Int, amountIn *big.Int, txFee *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.contract.Transact(opts, "ronSandwich", isALeg, payloads, tokenPairsAndFee, amountIn, txFee)
+}
+
+// RonSandwich is a paid mutator transaction binding the contract method 0x5801d473.
+//
+// Solidity: function ronSandwich(bool isALeg, (address,bytes,uint256)[] payloads, uint256[] tokenPairsAndFee, uint256 amountIn, uint256 txFee) payable returns()
+func (_Ronswapv3fe *Ronswapv3feSession) RonSandwich(isALeg bool, payloads []RonSwapV3FEPayload, tokenPairsAndFee []*big.Int, amountIn *big.Int, txFee *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.RonSandwich(&_Ronswapv3fe.TransactOpts, isALeg, payloads, tokenPairsAndFee, amountIn, txFee)
+}
+
+// RonSandwich is a paid mutator transaction binding the contract method 0x5801d473.
+//
+// Solidity: function ronSandwich(bool isALeg, (address,bytes,uint256)[] payloads, uint256[] tokenPairsAndFee, uint256 amountIn, uint256 txFee) payable returns()
+func (_Ronswapv3fe *Ronswapv3feTransactorSession) RonSandwich(isALeg bool, payloads []RonSwapV3FEPayload, tokenPairsAndFee []*big.Int, amountIn *big.Int, txFee *big.Int) (*types.Transaction, error) {
+	return _Ronswapv3fe.Contract.RonSandwich(&_Ronswapv3fe.TransactOpts, isALeg, payloads, tokenPairsAndFee, amountIn, txFee)
+}
+
 // RonSwapV3 is a paid mutator transaction binding the contract method 0x69bf3560.
 //
 // Solidity: function ronSwapV3(uint256[] tokenPairsAndFee, uint256 amountIn) returns(uint256 amountOut)
@@ -331,27 +331,6 @@ func (_Ronswapv3fe *Ronswapv3feSession) RonSwapV3(tokenPairsAndFee []*big.Int, a
 // Solidity: function ronSwapV3(uint256[] tokenPairsAndFee, uint256 amountIn) returns(uint256 amountOut)
 func (_Ronswapv3fe *Ronswapv3feTransactorSession) RonSwapV3(tokenPairsAndFee []*big.Int, amountIn *big.Int) (*types.Transaction, error) {
 	return _Ronswapv3fe.Contract.RonSwapV3(&_Ronswapv3fe.TransactOpts, tokenPairsAndFee, amountIn)
-}
-
-// SetFeeRate is a paid mutator transaction binding the contract method 0x45596e2e.
-//
-// Solidity: function setFeeRate(uint256 rate) returns()
-func (_Ronswapv3fe *Ronswapv3feTransactor) SetFeeRate(opts *bind.TransactOpts, rate *big.Int) (*types.Transaction, error) {
-	return _Ronswapv3fe.contract.Transact(opts, "setFeeRate", rate)
-}
-
-// SetFeeRate is a paid mutator transaction binding the contract method 0x45596e2e.
-//
-// Solidity: function setFeeRate(uint256 rate) returns()
-func (_Ronswapv3fe *Ronswapv3feSession) SetFeeRate(rate *big.Int) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.SetFeeRate(&_Ronswapv3fe.TransactOpts, rate)
-}
-
-// SetFeeRate is a paid mutator transaction binding the contract method 0x45596e2e.
-//
-// Solidity: function setFeeRate(uint256 rate) returns()
-func (_Ronswapv3fe *Ronswapv3feTransactorSession) SetFeeRate(rate *big.Int) (*types.Transaction, error) {
-	return _Ronswapv3fe.Contract.SetFeeRate(&_Ronswapv3fe.TransactOpts, rate)
 }
 
 // UniswapV2Call is a paid mutator transaction binding the contract method 0x10d1e85c.
