@@ -3,7 +3,6 @@ package uniswap
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -524,7 +523,7 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 	bestProfit := big.NewInt(0)
 	profitable := false
 
-	startTime := mclock.Now()
+	//startTime := mclock.Now()
 	if opt, iters, err := minimizeScalar(lpCycle, arbitrage, bound, options); err == nil {
 		x := opt.x
 		profit := new(big.Int).Neg(opt.fun)
@@ -542,7 +541,7 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 
 		lpCycle.best.swapAmount = new(big.Int).Set(swapAmount)
 		lpCycle.best.profitAmount = new(big.Int).Set(bestProfit)
-		log.Warn("RonFi CalculateArbitrage succeed", "hops", len(lpCycle.Pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "elapsed", mclock.Since(startTime).String())
+		//log.Warn("RonFi CalculateArbitrage succeed", "hops", len(lpCycle.Pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "elapsed", mclock.Since(startTime).String())
 
 		return &ProfitAmount{
 			Iters:      iters,
@@ -553,10 +552,11 @@ func (lpCycle *LPCycle) CalculateArbitrage() *ProfitAmount {
 			AmountOuts: amountOuts,
 			Boundary:   bound,
 		}
-	} else {
-		elapsed := mclock.Since(startTime)
-		log.Warn("RonFi CalculateArbitrage fail", "hops", len(lpCycle.Pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "eps", eps, "elapsed", elapsed.String(), "err", err)
 	}
+	//else {
+	//elapsed := mclock.Since(startTime)
+	//log.Warn("RonFi CalculateArbitrage fail", "hops", len(lpCycle.Pools), "tx", lpCycle.tx.Hash(), "loopId", lpCycle.LoopId, "iters", iters, "lower", lower, "upper", upper, "eps", eps, "elapsed", elapsed.String(), "err", err)
+	//}
 
 	return nil
 }

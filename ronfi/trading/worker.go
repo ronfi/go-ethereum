@@ -722,7 +722,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 
 	amountIn := big.NewInt(0)
 	if !ronSandwich.optimize(pairInfo, amountIn) {
-		log.Warn("RonFi sandwichTx optimize fail", "tx", tx.Hash().String(), "pair", pairInfo.Address)
+		//log.Warn("RonFi sandwichTx optimize fail", "tx", tx.Hash().String(), "pair", pairInfo.Address)
 		return
 	}
 
