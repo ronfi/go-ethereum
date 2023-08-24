@@ -185,7 +185,7 @@ func (s *Stats) report(header *types.Header) {
 						// maybe chain reorg
 						continue
 					}
-					log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
+					//log.Info("RonFi missed", "dexTx", tx.Hash().String(), "b", block.Number(), "index", txLookup.Index)
 				}
 			} else if isObs {
 				from, _ := types.Sender(signer, tx)

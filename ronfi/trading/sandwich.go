@@ -155,7 +155,7 @@ func (s *RonSandwich) prepare(pool *defi.SwapPairInfo, amountIn *big.Int) *RonSa
 }
 
 func (s *RonSandwich) optimize(pool *defi.SwapPairInfo, amountIn *big.Int) bool {
-	calculateF := func(appState *state.StateDB, pool *defi.SwapPairInfo, amountIn *big.Int) (*types.Transaction, bool, bool) {
+	calculateF := func(appState *state.StateDB, pool *defi.SwapPairInfo, amountIn *big.Int) (*types.Transaction, bool) {
 		var (
 			applySuccess, reverted bool
 			//err                    string
@@ -173,30 +173,23 @@ func (s *RonSandwich) optimize(pool *defi.SwapPairInfo, amountIn *big.Int) bool 
 					targetTxHash := ronFiTxHash(s.targetTx.Hash())
 					if applySuccess, reverted, _, _ = applyTransaction(s.chain, s.chainConfig, s.block, s.targetTx, targetTxHash, appState); applySuccess && !reverted {
 						//log.Info("RonFi Sandwich calculateF applyTransaction targetTx succeed!", "targetTx", s.targetTx.Hash().String(), "pair", pool.Address, "amountIn", amountIn)
-						return frontRunTx, false, true
-					} else {
-						return nil, true, false
+						return frontRunTx, true
 					}
 				}
 			}
 		}
 
-		return nil, false, false
+		return nil, false
 	}
 
 	return s.binarySearch(pool, calculateF, s.lowerBound, s.upperBound, s.tolerance, amountIn)
 }
 
-func (s *RonSandwich) binarySearch(pool *defi.SwapPairInfo, calculateF func(appState *state.StateDB, pool *defi.SwapPairInfo, amountIn *big.Int) (*types.Transaction, bool, bool), left, right *big.Int, tolerance *big.Int, amountIn *big.Int) bool {
+func (s *RonSandwich) binarySearch(pool *defi.SwapPairInfo, calculateF func(appState *state.StateDB, pool *defi.SwapPairInfo, amountIn *big.Int) (*types.Transaction, bool), left, right *big.Int, tolerance *big.Int, amountIn *big.Int) bool {
 	gap := new(big.Int).Sub(right, left)
 	if gap.Cmp(tolerance) > 0 {
 		mid := new(big.Int).Add(left, new(big.Int).Div(gap, big.NewInt(2)))
-		_, terminate, ok := calculateF(s.appState.Copy(), pool, mid)
-		if terminate {
-			// apply target tx failed, then exit the iteration
-			return false
-		}
-		if ok {
+		if _, ok := calculateF(s.appState.Copy(), pool, mid); ok {
 			// Number go up
 			amountIn.Set(mid)
 			return s.binarySearch(pool, calculateF, mid, right, tolerance, amountIn)
