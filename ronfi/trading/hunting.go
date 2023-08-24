@@ -10,11 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	ronswapv3fe "github.com/ethereum/go-ethereum/ronfi/contracts/contract_ronswapv3fe"
+	"github.com/ethereum/go-ethereum/ronfi/defi"
 	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	"github.com/metachris/flashbotsrpc"
 	"math/big"
-	"runtime"
-	"sync/atomic"
 )
 
 var (
@@ -43,7 +42,7 @@ func (w *Worker) InitRonFiSwap() bool {
 	return true
 }
 
-func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddress *common.Address, tx *types.Transaction, profitMin *big.Int, gasLimit uint64, bestProfit *uniswap.CycleWithProfit, dryRun bool, handlerStartTime mclock.AbsTime) (bool, *types.Transaction) {
+func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddress *common.Address, tx *types.Transaction, pairInfo *defi.SwapPairInfo, gasLimit uint64, bestProfit *uniswap.CycleWithProfit, dryRun bool, handlerStartTime mclock.AbsTime) (bool, *types.Transaction) {
 	options, err := bind.NewKeyedTransactorWithChainID(executorPrivKey, big.NewInt(rcommon.CHAIN_ID))
 	if err != nil {
 		log.Error("RonFi swap transaction, get options failed!", "reason", err)
@@ -58,18 +57,6 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 	options.GasPrice = w.gasPrice
 	options.GasLimit = gasLimit
 	options.NoSend = true //only return signedTx
-
-	//if gasTipCap, err := w.client.SuggestGasTipCap(context.Background()); err != nil {
-	//	log.Warn("RonFi DexSwapHunting, get SuggestGasTipCap failed!", "err", err)
-	//	return false, nil
-	//} else {
-	//	options.GasTipCap = gasTipCap
-	//
-	//	// max_fee = base_fee * 2
-	//	gasFeeCap := big.NewInt(0).Mul(w.gasPrice, big.NewInt(2))
-	//	gasFeeCap = gasFeeCap.Add(gasFeeCap, gasTipCap)
-	//	options.GasFeeCap = gasFeeCap
-	//}
 
 	path := make([]common.Address, 0, len(bestProfit.Cycle.PoolAddresses)*2)
 	dirs := make([]uint8, 0, len(bestProfit.Cycle.PoolAddresses))
@@ -113,7 +100,7 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 
 	var arbTx *types.Transaction
 	if arb, e := ronV3Swap.RonSwapV3(options, tokenPairsAndFee, amountIn); e != nil {
-		log.Error("RonFi swap transaction, create swap transaction failed!", "reason", e)
+		log.Error("RonFi DexSwapHunting, create swap transaction failed!", "reason", e)
 		return false, nil
 	} else {
 		arbTx = arb
@@ -122,25 +109,39 @@ func (w *Worker) DexSwapHunting(executorPrivKey *ecdsa.PrivateKey, executorAddre
 	arbTx.RonTxType = types.RonTxIsArbTx
 	arbTx.RonPeerName = "self"
 
-	log.Info("RonFi broadcast transaction",
-		"dexTx", tx.Hash(),
-		"arbTx", arbTx.Hash(),
-		"gasPrice", arbTx.GasPrice(),
-		"gasLimit", gasLimit,
-		"nonce", arbTx.Nonce(),
-		"runningGoRoutine", runtime.NumGoroutine(),
-		"runningApp", atomic.LoadInt64(&w.runningApp),
-		"elapsed", mclock.Since(handlerStartTime).String())
-
-	if !dryRun {
-		txs := make([]*types.Transaction, 0, 2)
-		txs = append(txs, tx)
-		txs = append(txs, arbTx)
-		Flashbot(flashRpc, w.currentBlock, w.currentBlockNum, txs)
-		return true, arbTx
-
+	_, appState := w.stateDbsConsumeOneCopy()
+	if applySuccess, reverted, _, err := applyTransaction(w.chain, w.chainConfig, w.currentBlock, tx, tx.Hash(), appState); !applySuccess || reverted {
+		log.Warn("RonFi DexSwapHunting, apply dexTx failed!", "applySuccess", applySuccess, "reverted", reverted, "err", err)
+		return false, nil
 	} else {
-		log.Info("RonFi ", "dexTx", tx.Hash().String(), "arbTx", arbTx.Hash().String(), "dryRun", dryRun)
+		if applySuccess, reverted, gasUsed, err := applyTransaction(w.chain, w.chainConfig, w.currentBlock, arbTx, arbTx.Hash(), appState); !applySuccess || reverted {
+			log.Warn("RonFi DexSwapHunting, apply arbTx failed!", "applySuccess", applySuccess, "reverted", reverted, "gasUsed", gasUsed, "err", err)
+			return false, nil
+		} else {
+			vLogs := appState.GetLogs(arbTx.Hash(), w.currentBlockNum, common.Hash{})
+			pairsInfo := w.di.ExtractSwapPairInfo(arbTx, *arbTx.To(), vLogs, defi.RonFiExtractTypeStats)
+			profit := calculateArbProfit(pairInfo, pairsInfo)
+			if profit != nil || profit.Cmp(big.NewInt(0)) <= 0 {
+				log.Warn("RonFi DexSwapHunting, profit is not positive", "profit", profit)
+			}
+			arbTxFee := new(big.Int).Div(new(big.Int).Mul(profit, big.NewInt(60)), big.NewInt(100))
+			gasUsed += 5000 // add 5k gas for arbTx
+			bLegTxGasPrice := new(big.Int).Div(arbTxFee, big.NewInt(int64(gasUsed)))
+			options.GasPrice = bLegTxGasPrice
+			if arb, e := ronV3Swap.RonSwapV3(options, tokenPairsAndFee, amountIn); e == nil {
+				arbTx = arb
+				if !dryRun {
+					txs := make([]*types.Transaction, 0, 2)
+					txs = append(txs, tx)
+					txs = append(txs, arbTx)
+					Flashbot(flashRpc, w.currentBlock, w.currentBlockNum, txs)
+					return true, arbTx
+
+				} else {
+					log.Info("RonFi DexSwapHunting", "dexTx", tx.Hash().String(), "arbTx", arbTx.Hash().String(), "dryRun", dryRun)
+				}
+			}
+		}
 	}
 
 	return false, nil

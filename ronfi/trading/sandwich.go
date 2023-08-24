@@ -412,7 +412,7 @@ func (s *RonSandwich) executeABLegTx(pool *defi.SwapPairInfo, amountIn *big.Int,
 
 		vlogs := appState.GetLogs(ronFiTxHash(tx.Hash()), s.block.NumberU64(), common.Hash{})
 		if isAleg {
-			swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
+			swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeStats)
 			if len(swapPairsInfo) == 0 {
 				return nil
 			}

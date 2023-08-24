@@ -686,7 +686,7 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 			return
 		}
 		vlogs := appState.GetLogs(ronfiTxHash, w.currentBlockNum, common.Hash{})
-		swapPairsInfo := w.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
+		swapPairsInfo := w.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeStats)
 		if len(swapPairsInfo) > 0 {
 			//w.huntingTxEvent(appState, tx, 0, swapPairsInfo, handlerStartTime)
 			_, newStatedb := w.stateDbsConsumeOneCopy()
@@ -830,8 +830,8 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 
 		aLogs := statedbCopy.GetLogs(aLegTx.Hash(), w.currentBlockNum, common.Hash{})
 		bLogs := statedbCopy.GetLogs(bLegTx.Hash(), w.currentBlockNum, common.Hash{})
-		aPairsInfo := w.di.ExtractSwapPairInfo(aLegTx, *aLegTx.To(), aLogs, defi.RonFiExtractTypeHunting)
-		bPairsInfo := w.di.ExtractSwapPairInfo(bLegTx, *bLegTx.To(), bLogs, defi.RonFiExtractTypeHunting)
+		aPairsInfo := w.di.ExtractSwapPairInfo(aLegTx, *aLegTx.To(), aLogs, defi.RonFiExtractTypeStats)
+		bPairsInfo := w.di.ExtractSwapPairInfo(bLegTx, *bLegTx.To(), bLogs, defi.RonFiExtractTypeStats)
 		grossProfit := calculateSandwichProfit(pairInfo, aPairsInfo, bPairsInfo)
 		if grossProfit == nil || grossProfit.Cmp(big.NewInt(0)) <= 0 {
 			log.Warn("RonFi sandwichTx calculateSandwichProfit fail", "tx", tx.Hash().String(), "pair", pairInfo.Address)
@@ -1057,13 +1057,13 @@ func (w *Worker) huntingTxPair(tx *types.Transaction, pairId int, handlerStartTi
 	}()
 
 	gasMaxLimit := bestProfit.Cycle.SumGasNeed
-	profitMin := rcommon.ToWei(info.txFeeInToken, 18)
+	//profitMin := rcommon.ToWei(info.txFeeInToken, 18)
 	randomExecutorId := bestProfit.Cycle.LoopId.Uint64() + tx.Hash().TailUint64()
 	// run the ring to draw an executor
 	ringId := randomExecutorId % w.totalExecutors
 	var arbTx *types.Transaction
 
-	if ok, arb := w.DexSwapHunting(w.executorPrivKey[ringId], &w.executorAddress[ringId], tx, profitMin, gasMaxLimit, bestProfit, w.dryRun, handlerStartTime); !ok {
+	if ok, arb := w.DexSwapHunting(w.executorPrivKey[ringId], &w.executorAddress[ringId], tx, swapPairInfo, gasMaxLimit, bestProfit, w.dryRun, handlerStartTime); !ok {
 		w.huntingSkipStat[SkipReasonDexSwapHuntingFail]++
 	} else {
 		arbTx = arb

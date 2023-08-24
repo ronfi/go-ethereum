@@ -116,7 +116,7 @@ func calculateSandwichProfit(pool *defi.SwapPairInfo, aPairsInfo, bPairsInfo []*
 		arbIn, arbOut               *big.Int
 	)
 
-	if len(aPairsInfo) == 0 || len(bPairsInfo) == 0 {
+	if len(aPairsInfo) > 0 && len(bPairsInfo) > 0 {
 		for _, pairInfo := range aPairsInfo {
 			if pairInfo.Address == pool.Address && pool.Dir == pairInfo.Dir {
 				aLegAmountIn = pairInfo.AmountIn
@@ -163,6 +163,35 @@ func calculateSandwichProfit(pool *defi.SwapPairInfo, aPairsInfo, bPairsInfo []*
 				// calculate profit
 				profit = big.NewInt(0).Sub(bLegAmountOut, aLegAmountIn)
 			}
+		}
+	}
+
+	return profit
+}
+
+func calculateArbProfit(pool *defi.SwapPairInfo, pairsInfo []*defi.SwapPairInfo) *big.Int {
+	var (
+		profit        *big.Int
+		arbIn, arbOut *big.Int
+	)
+
+	if len(pairsInfo) > 1 {
+
+		// find in and out amount for arb loop
+		for _, pairInfo := range pairsInfo {
+			if pairInfo.Address == pool.Address {
+				if pool.Dir == pairInfo.Dir {
+					arbIn = pairInfo.AmountIn
+				} else {
+					arbOut = pairInfo.AmountOut
+				}
+			}
+		}
+
+		if arbIn != nil && arbOut != nil {
+			// calculate profit
+			arbProfit := big.NewInt(0).Sub(profit, big.NewInt(0).Sub(arbIn, arbOut))
+			profit = arbProfit
 		}
 	}
 
