@@ -751,14 +751,14 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		aLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(aLegGas))
 		aLegTx := ronSandwich.buildExecuteTx(aLegPayloads, true, []*big.Int{}, big.NewInt(0), aLegTxFee, aLegNonce, w.gasPrice, aLegGas)
 		// apply aLegTx
-		if applySuccess, reverted, gasUsed, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, aLegTx, aLegTx.Hash(), statedbCopy); !applySuccess || reverted {
+		if applySuccess, reverted, gasUsed, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, aLegTx, ronFiTxHash(aLegTx.Hash()), statedbCopy); !applySuccess || reverted {
 			log.Warn("RonFi sandwichTx apply aLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "before gas", res.bLegGasUsed, "gas", gasUsed, "err", err)
 			return
 		}
 		txs = append(txs, aLegTx)
 
 		// targetTx
-		if applySuccess, reverted, _, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, tx, tx.Hash(), statedbCopy); !applySuccess || reverted {
+		if applySuccess, reverted, _, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, tx, ronFiTxHash(tx.Hash()), statedbCopy); !applySuccess || reverted {
 			log.Warn("RonFi sandwichTx apply target tx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 			return
 		}
@@ -810,7 +810,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			}
 
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmount, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
-			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, bLegTx.Hash(), statedbCopy); !applySuccess || reverted {
+			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, ronFiTxHash(bLegTx.Hash()), statedbCopy); !applySuccess || reverted {
 				log.Warn("RonFi sandwichTx apply bLegTx+arbTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 				return
 			}
@@ -818,7 +818,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			log.Warn("RonFi sandwichTx apply bLegTx+arbTx succeed", "tx", tx.Hash().String(), "pair", pairInfo.Address, "gasUsed", realBLegGas)
 		} else {
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, nil, nil, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
-			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, bLegTx.Hash(), statedbCopy); !applySuccess || reverted {
+			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, ronFiTxHash(bLegTx.Hash()), statedbCopy); !applySuccess || reverted {
 				log.Warn("RonFi sandwichTx apply bLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 				return
 			}
