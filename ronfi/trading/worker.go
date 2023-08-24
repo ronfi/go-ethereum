@@ -735,9 +735,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			"amountIn", rcommon.EthBigInt2Float64(amountIn),
 			"bLegAmount", rcommon.EthBigInt2Float64(bLegAmount))
 
-		txs := make([]*types.Transaction, 0, 4)
-		cycle, swapAmount, hasArb := w.sandwichBackRun(res.appState, tx, pairInfo, ronSandwich, handlerStartTime)
-		swapAmountIn = swapAmount
+		txs := make([]*types.Transaction, 0, 3)
 
 		// build bundle
 		aLegGas := res.aLegGasUsed + 5000 // add 100k gas for aLeg
@@ -752,7 +750,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		aLegTx := ronSandwich.buildExecuteTx(aLegPayloads, true, []*big.Int{}, big.NewInt(0), aLegTxFee, aLegNonce, w.gasPrice, aLegGas)
 		// apply aLegTx
 		if applySuccess, reverted, gasUsed, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, aLegTx, ronFiTxHash(aLegTx.Hash()), statedbCopy); !applySuccess || reverted {
-			log.Warn("RonFi sandwichTx apply aLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "before gas", res.bLegGasUsed, "gas", gasUsed, "err", err)
+			log.Warn("RonFi sandwichTx apply aLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "before gas", res.aLegGasUsed, "gas", gasUsed, "err", err)
 			return
 		}
 		txs = append(txs, aLegTx)
@@ -765,6 +763,8 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		txs = append(txs, tx)
 
 		//bLegTx
+		cycle, swapAmount, hasArb := w.sandwichBackRun(res.appState, tx, pairInfo, ronSandwich, handlerStartTime)
+		swapAmountIn = swapAmount
 		rPairInfo := pairInfo.Reverse()
 		bLegPayloads, _ := ronSandwich.generatePayloads(rPairInfo, bLegAmount, res.tokenFee, statedbCopy)
 		bLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(bLegGas))
