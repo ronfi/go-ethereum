@@ -726,7 +726,9 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		return
 	}
 
-	if appState, bLegAmount, aLegGas, bLegGas, ok := ronSandwich.prepare(pairInfo, amountIn); ok {
+	if res := ronSandwich.prepare(pairInfo, amountIn); res != nil {
+		bLegAmount := res.bLegAmountIn
+
 		log.Info("RonFi sandwichTx prepare succeed",
 			"tx", tx.Hash().String(),
 			"pair", pairInfo.Address,
@@ -742,14 +744,14 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		swapAmoutIn = swapAmount
 
 		// build bundle
-		aLegGas += 5000 // add 100k gas for aLeg
-		bLegGas += 5000 // add 100k gas for bLeg
+		aLegGas := res.aLegGasUsed + 5000 // add 100k gas for aLeg
+		bLegGas := res.bLegGasUsed + 5000 // add 100k gas for bLeg
 
 		_, statedbCopy := w.stateDbsConsumeOneCopy()
 		aLegNonce := statedbCopy.GetNonce(executorAddress)
 		bLegNonce := aLegNonce + 1
 		// aLegTx
-		aLegPayloads := ronSandwich.generatePayloads(pairInfo, amountIn, statedbCopy)
+		aLegPayloads, _ := ronSandwich.generatePayloads(pairInfo, amountIn, nil, statedbCopy)
 		aLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(aLegGas))
 		aLegTx := ronSandwich.buildExecuteTx(aLegPayloads, true, []*big.Int{}, big.NewInt(0), aLegTxFee, aLegNonce, w.gasPrice, aLegGas)
 		// apply aLegTx
@@ -770,7 +772,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 
 		//bLegTx
 		rPairInfo := pairInfo.Reverse()
-		bLegPayloads := ronSandwich.generatePayloads(rPairInfo, bLegAmount, statedbCopy)
+		bLegPayloads, _ := ronSandwich.generatePayloads(rPairInfo, bLegAmount, res.tokenFee, statedbCopy)
 		bLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(bLegGas))
 		var bLegTx *types.Transaction
 		if hasArb {
