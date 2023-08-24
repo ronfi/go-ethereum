@@ -855,9 +855,11 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 	for _, info := range pairsInfo {
 		if info.TokenIn == rcommon.WETH {
 			w.sandwichTx(tx, info, appState, handlerStartTime)
-		} else {
-			w.backRun(appState, tx, pairId, pairsInfo, handlerStartTime)
 		}
+
+		//else {
+		//	w.backRun(appState, tx, pairId, pairsInfo, handlerStartTime)
+		//}
 	}
 
 	return
