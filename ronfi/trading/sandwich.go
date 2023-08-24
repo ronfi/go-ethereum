@@ -2,49 +2,75 @@ package trading
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
 	erc20token "github.com/ethereum/go-ethereum/ronfi/contracts/contract_erc20"
 	ronswapv3fe "github.com/ethereum/go-ethereum/ronfi/contracts/contract_ronswapv3fe"
 	v2 "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v2pair"
 	v3 "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
 	"github.com/ethereum/go-ethereum/ronfi/defi"
+	"github.com/ethereum/go-ethereum/ronfi/uniswap"
 	uniswapV2 "github.com/ethereum/go-ethereum/ronfi/uniswap/v2"
 	uniswapV3 "github.com/ethereum/go-ethereum/ronfi/uniswap/v3"
 	"math/big"
 	"strings"
 )
 
+var intGasPrice = new(big.Int).Mul(big.NewInt(75), big.NewInt(params.GWei))
+
 type RonSandwich struct {
-	worker      *Worker
+	client      *ethclient.Client
+	di          *defi.Info
+	ronSwapInst *ronswapv3fe.Ronswapv3fe
 	privKey     *ecdsa.PrivateKey
 	execAddress common.Address
+	chain       *core.BlockChain
+	chainConfig *params.ChainConfig
+	block       *types.Block
 	targetTx    *types.Transaction
-	pools       []*defi.SwapPairInfo
+	pool        *defi.SwapPairInfo
 	appState    *state.StateDB
 	lowerBound  *big.Int
 	upperBound  *big.Int
 	tolerance   *big.Int
 }
 
-func NewRonSandwich(worker *Worker, executorPrivKey *ecdsa.PrivateKey, executorAddress common.Address, targetTx *types.Transaction, pairsInfo []*defi.SwapPairInfo, appState *state.StateDB) *RonSandwich {
+func NewRonSandwich(
+	client *ethclient.Client,
+	di *defi.Info,
+	ronSwapInst *ronswapv3fe.Ronswapv3fe,
+	executorPrivKey *ecdsa.PrivateKey,
+	executorAddress common.Address,
+	chain *core.BlockChain,
+	chainConfig *params.ChainConfig,
+	block *types.Block,
+	targetTx *types.Transaction,
+	pairInfo *defi.SwapPairInfo,
+	appState *state.StateDB) *RonSandwich {
 	ronSandWich := &RonSandwich{
-		worker:      worker,
+		client:      client,
+		di:          di,
+		ronSwapInst: ronSwapInst,
 		privKey:     executorPrivKey,
 		execAddress: executorAddress,
+		chain:       chain,
+		chainConfig: chainConfig,
+		block:       block,
 		targetTx:    targetTx,
 		appState:    appState,
 	}
 
 	ronSandWich.lowerBound = big.NewInt(0)
-	balance := worker.di.GetTokenBalance(txpool.RonFiSwapV3Address, rcommon.WETH)
+	balance := di.GetTokenBalance(txpool.RonFiSwapV3Address, rcommon.WETH)
 	if balance == nil {
 		log.Warn("RonFi Sandwich NewRonSandwich GetTokenBalance failed", "tx", targetTx.Hash(), "RonFiSwapV3Address", txpool.RonFiSwapV3Address)
 		return nil
@@ -53,127 +79,67 @@ func NewRonSandwich(worker *Worker, executorPrivKey *ecdsa.PrivateKey, executorA
 	}
 	ronSandWich.tolerance = new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil) //0.001 weth
 
-	pools := make([]*defi.SwapPairInfo, 0, len(pairsInfo))
-	for _, info := range pairsInfo {
-		// only keep pair/pool whose tokenIn is WETH
-		if info.TokenIn == rcommon.WETH {
-			pools = append(pools, info)
-		}
+	// only keep pair/pool whose tokenIn is WETH
+	if pairInfo.TokenIn != rcommon.WETH {
+		return nil
 	}
 
-	if len(pools) > 0 {
-		ronSandWich.pools = pools
-		return ronSandWich
-	}
-
-	return nil
+	ronSandWich.pool = pairInfo
+	return ronSandWich
 }
 
-func (s *RonSandwich) Build() ([]*types.Transaction, bool) {
-	txs := make([]*types.Transaction, 0, 4)
+func (s *RonSandwich) prepare(pool *defi.SwapPairInfo, amountIn *big.Int) (*state.StateDB, *big.Int, uint64, uint64, bool) {
+	var aLegAmountOut *big.Int
+	appState := s.appState.Copy()
+	// aLeg tx
+	var (
+		feeRate                  *big.Int
+		tokenPairsAndFee         []*big.Int
+		arbAIn, txFee            *big.Int
+		aLegGasUsed, bLegGasUsed uint64
+	)
 
-	//iterate pools
-	for _, pool := range s.pools {
-		amountIn := big.NewInt(0)
-		ok := s.optimize(pool, amountIn)
-		if ok && amountIn.Cmp(big.NewInt(0)) > 0 {
-			//log.Info("RonFi Sandwich Build optimize succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn)
-			var aLegAmountOut *big.Int
-			appState := s.appState.Copy()
-			// aLeg tx
-			var (
-				feeRate                  *big.Int
-				aLegGasUsed, bLegGasUsed uint64
-			)
-			if aLegTx, fee, tmp, gasUsed, ok := s.sandWichTx(pool, amountIn, appState, true); !ok {
-				log.Warn("RonFi Sandwich Build aLegTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
-				return txs, false
-			} else {
-				aLegAmountOut = tmp
-				aLegGasUsed = gasUsed
-				txs = append(txs, aLegTx)
-				feeRate = fee
-			}
-			log.Info("RonFi Sandwich Build aLegTx succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", aLegAmountOut, "feeRate", feeRate)
+	arbAIn = big.NewInt(0)
+	txFee = big.NewInt(0)
+	if res := s.executeABLegTx(pool, amountIn, appState, true, tokenPairsAndFee, arbAIn, txFee); res == nil {
+		log.Warn("RonFi Sandwich Build aLegTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+		return nil, nil, 0, 0, false
+	} else {
+		aLegAmountOut = res.amountOut
+		feeRate = res.feeRate
+		aLegGasUsed = res.gasUsed
+	}
+	log.Info("RonFi Sandwich Build aLegTx succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", aLegAmountOut, "feeRate", feeRate)
 
-			// target tx
-			if applySuccess, reverted, _, err := s.worker.applyTransaction(s.targetTx, ronFiTxHash(s.targetTx.Hash()), appState); !applySuccess || reverted {
-				log.Warn("RonFi Sandwich Build applyTransaction targetTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
-				return txs, false
-			} else {
-				txs = append(txs, s.targetTx)
-			}
+	// target tx
+	if applySuccess, reverted, _, err := applyTransaction(s.chain, s.chainConfig, s.block, s.targetTx, ronFiTxHash(s.targetTx.Hash()), appState); !applySuccess || reverted {
+		log.Warn("RonFi Sandwich Build applyTransaction targetTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+		return nil, nil, 0, 0, false
+	}
 
-			// bLeg tx
-			rPool := pool.Reverse()
-			bLegAmountIn := aLegAmountOut
-			if feeRate != nil && feeRate.Cmp(big.NewInt(0)) > 0 {
-				bLegAmountIn = new(big.Int).Sub(aLegAmountOut, new(big.Int).Div(new(big.Int).Mul(aLegAmountOut, feeRate), big.NewInt(10000)))
-			}
-			if _, _, bLegAmountOut, gasUsed, ok := s.sandWichTx(rPool, bLegAmountIn, appState, false); !ok {
-				log.Warn("RonFi Sandwich Build bLegTx failed",
-					"tx", s.targetTx.Hash(),
-					"pair", rPool.Address,
-					"tokenIn", rPool.TokenIn,
-					"amountIn", bLegAmountIn)
-				return txs, false
-			} else {
-				bLegGasUsed = gasUsed
-				log.Info("RonFi Sandwich Build bLegTx succeed!", "tx", s.targetTx.Hash(), "pair", rPool.Address, "amountIn", bLegAmountIn, "amountOut", bLegAmountOut)
-				if bLegAmountOut.Cmp(amountIn) <= 0 {
-					log.Warn("RonFi Sandwich Build not profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", bLegAmountOut)
-					return txs, false
-				} else {
-					profit := new(big.Int).Sub(bLegAmountOut, amountIn)
-					totalGasUsed := aLegGasUsed + bLegGasUsed
-					txFee := new(big.Int).Mul(big.NewInt(int64(totalGasUsed)), s.worker.gasPrice)
-					netProfit := new(big.Int).Sub(profit, txFee)
-					if netProfit.Cmp(big.NewInt(0)) <= 0 {
-						log.Warn("RonFi Sandwich Build net profit not profitable",
-							"tx", s.targetTx.Hash(),
-							"pair", pool.Address,
-							"amountIn", amountIn,
-							"amountOut", bLegAmountOut,
-							"profit", profit,
-							"netProfit", netProfit,
-							"txFee", txFee)
-						return txs, false
-					} else {
-						bribeFee := new(big.Int).Div(new(big.Int).Mul(netProfit, big.NewInt(60)), big.NewInt(100)) // 80% net profit to miner
-						bLegTxFee := new(big.Int).Add(new(big.Int).Mul(big.NewInt(int64(bLegGasUsed)), s.worker.gasPrice), bribeFee)
-						bLegGasFee := new(big.Int).Div(bLegTxFee, big.NewInt(int64(bLegGasUsed)))
-						log.Info("RonFi Sandwich Build profitable",
-							"tx", s.targetTx.Hash(),
-							"pair", pool.Address,
-							"amountIn", amountIn,
-							"amountOut", bLegAmountOut,
-							"netProfit", netProfit)
-
-						payloads := s.generatePayloads(rPool, bLegAmountIn, appState)
-						if len(payloads) == 0 {
-							return txs, false
-						}
-						if tx := s.buildExecuteTx(pool, payloads, true, false, s.appState.GetNonce(s.execAddress)+1, bLegGasFee); tx != nil {
-							txs = append(txs, tx)
-							if profit.Cmp(txFee) > 0 {
-								log.Info("RonFi Sandwich Build profitable",
-									"tx", s.targetTx.Hash(),
-									"pair", pool.Address,
-									"amountIn", amountIn,
-									"amountOut", bLegAmountOut,
-									"profit", profit,
-									"bribeFee", bribeFee,
-									"ronProfit", new(big.Int).Sub(netProfit, bribeFee))
-								return txs, true
-							}
-						}
-					}
-				}
-			}
+	// bLeg tx
+	rPool := pool.Reverse()
+	bLegAmountIn := aLegAmountOut
+	if feeRate != nil && feeRate.Cmp(big.NewInt(0)) > 0 {
+		bLegAmountIn = new(big.Int).Sub(aLegAmountOut, new(big.Int).Div(new(big.Int).Mul(aLegAmountOut, feeRate), big.NewInt(10000)))
+	}
+	if res := s.executeABLegTx(rPool, bLegAmountIn, appState, false, tokenPairsAndFee, arbAIn, txFee); res == nil {
+		log.Warn("RonFi Sandwich Build bLegTx failed",
+			"tx", s.targetTx.Hash(),
+			"pair", rPool.Address,
+			"tokenIn", rPool.TokenIn,
+			"amountIn", bLegAmountIn)
+	} else {
+		log.Info("RonFi Sandwich Build bLegTx succeed!", "tx", s.targetTx.Hash(), "pair", rPool.Address, "amountIn", bLegAmountIn, "amountOut", res.amountOut)
+		if res.amountOut.Cmp(amountIn) <= 0 {
+			log.Warn("RonFi Sandwich Build not profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", res.amountOut)
+		} else {
+			bLegGasUsed = res.gasUsed
+			return appState, bLegAmountIn, aLegGasUsed, bLegGasUsed, true
 		}
 	}
 
-	return txs, true
+	return nil, nil, 0, 0, false
 }
 
 func (s *RonSandwich) optimize(pool *defi.SwapPairInfo, amountIn *big.Int) bool {
@@ -181,16 +147,19 @@ func (s *RonSandwich) optimize(pool *defi.SwapPairInfo, amountIn *big.Int) bool 
 		var (
 			applySuccess, reverted bool
 			//err                    string
+			tokenPairsAndFee []*big.Int
 		)
 
+		arbAIn := big.NewInt(0)
+		txFee := big.NewInt(0)
 		payloads := s.generatePayloads(pool, amountIn, appState)
 		if len(payloads) > 0 {
 			// create tx and apply
 			nonce := appState.GetNonce(s.execAddress)
-			if frontRunTx := s.buildExecuteTx(pool, payloads, true, true, nonce, s.worker.gasPrice); frontRunTx != nil {
-				if applySuccess, reverted, _, _ = s.worker.applyTransaction(frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState); applySuccess && !reverted {
+			if frontRunTx := s.buildExecuteTx(payloads, true, tokenPairsAndFee, arbAIn, txFee, nonce, intGasPrice, GasLimitDefault); frontRunTx != nil {
+				if applySuccess, reverted, _, _ = applyTransaction(s.chain, s.chainConfig, s.block, frontRunTx, ronFiTxHash(frontRunTx.Hash()), appState); applySuccess && !reverted {
 					targetTxHash := ronFiTxHash(s.targetTx.Hash())
-					if applySuccess, reverted, _, _ = s.worker.applyTransaction(s.targetTx, targetTxHash, appState); applySuccess && !reverted {
+					if applySuccess, reverted, _, _ = applyTransaction(s.chain, s.chainConfig, s.block, s.targetTx, targetTxHash, appState); applySuccess && !reverted {
 						//log.Info("RonFi Sandwich calculateF applyTransaction targetTx succeed!", "targetTx", s.targetTx.Hash().String(), "pair", pool.Address, "amountIn", amountIn)
 						return frontRunTx, false, true
 					} else {
@@ -263,7 +232,7 @@ func (s *RonSandwich) genTransTxPayload(token common.Address, to common.Address,
 
 func (s *RonSandwich) genSwapTxPayload(appState *state.StateDB, pool *defi.SwapPairInfo, amountIn *big.Int) (payload ronswapv3fe.RonSwapV3FEPayload, amountOut *big.Int, ok bool) {
 	if !pool.V3 {
-		v2PoolInst := uniswapV2.NewV2Pool(s.worker.di, pool.Address, 30, appState)
+		v2PoolInst := uniswapV2.NewV2Pool(s.di, pool.Address, 30, appState)
 		if v2PoolInst == nil {
 			log.Warn("RonFi Sandwich genSwapTxPayload NewV2Pool failed", "pair", pool.Address)
 			return
@@ -315,7 +284,7 @@ func (s *RonSandwich) genSwapTxPayload(appState *state.StateDB, pool *defi.SwapP
 			Value:  value,
 		}
 	} else {
-		poolInfo := s.worker.di.GetPoolInfo(pool.Address)
+		poolInfo := s.di.GetPoolInfo(pool.Address)
 		if poolInfo == nil {
 			log.Warn("RonFi Sandwich genSwapTxPayload GetPoolInfo failed", "pool", pool.Address)
 			return
@@ -326,7 +295,7 @@ func (s *RonSandwich) genSwapTxPayload(appState *state.StateDB, pool *defi.SwapP
 				return
 			}
 
-			v3PoolInst := uniswapV3.NewV3Pool(s.worker.di, s.targetTx, pool.Address, tickLens, appState)
+			v3PoolInst := uniswapV3.NewV3Pool(s.di, s.targetTx, pool.Address, tickLens, appState)
 			if v3PoolInst == nil {
 				log.Warn("RonFi Sandwich genSwapTxPayload NewV3Pool failed", "pool", pool.Address)
 				return
@@ -386,21 +355,17 @@ func (s *RonSandwich) generatePayloads(pool *defi.SwapPairInfo, amountIn *big.In
 	return payloads
 }
 
-func (s *RonSandwich) buildExecuteTx(pool *defi.SwapPairInfo, payloads []ronswapv3fe.RonSwapV3FEPayload, isSandwich, isAleg bool, nonce uint64, gasFee *big.Int) *types.Transaction {
+func (s *RonSandwich) buildExecuteTx(payloads []ronswapv3fe.RonSwapV3FEPayload, isAleg bool, tokenPairsAndFee []*big.Int, amountIn, txFee *big.Int, nonce uint64, gasPrice *big.Int, gas uint64) *types.Transaction {
 	if options, err := bind.NewKeyedTransactorWithChainID(s.privKey, big.NewInt(rcommon.CHAIN_ID)); err != nil {
 		return nil
 	} else {
 		options.Nonce = new(big.Int).SetUint64(nonce)
 		options.Value = big.NewInt(0)
-		if gasLimit, ok := s.worker.pairGasMap[fmt.Sprintf("%s-%d", pool.Address, pool.Dir)]; ok {
-			options.GasLimit = gasLimit
-		} else {
-			options.GasLimit = GasLimitOneHop
-		}
-		options.GasPrice = gasFee
+		options.GasLimit = gas
+		options.GasPrice = gasPrice
 		options.NoSend = true //only return signedTx
 
-		if tx, err := s.worker.ronSwapInst.ExecutePayloads(options, isSandwich, isAleg, payloads); err == nil {
+		if tx, err := s.ronSwapInst.RonSandwich(options, isAleg, payloads, tokenPairsAndFee, amountIn, txFee); err == nil {
 			return tx
 		}
 	}
@@ -408,7 +373,14 @@ func (s *RonSandwich) buildExecuteTx(pool *defi.SwapPairInfo, payloads []ronswap
 	return nil
 }
 
-func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, appState *state.StateDB, isAleg bool) (*types.Transaction, *big.Int, *big.Int, uint64, bool) {
+type SandwichRes struct {
+	tx        *types.Transaction
+	feeRate   *big.Int
+	amountOut *big.Int
+	gasUsed   uint64
+}
+
+func (s *RonSandwich) executeABLegTx(pool *defi.SwapPairInfo, amountIn *big.Int, appState *state.StateDB, isAleg bool, tokenPairsAndFee []*big.Int, arbAIn, txFee *big.Int) *SandwichRes {
 	var (
 		applySuccess, reverted bool
 		gasUsed                uint64
@@ -418,14 +390,14 @@ func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, app
 
 	payloads := s.generatePayloads(pool, amountIn, appState)
 	if len(payloads) == 0 {
-		log.Warn("RonFi Sandwich payloads empty", "tx", s.targetTx.Hash(), "pair", pool.Address, "isAleg", isAleg)
-		return nil, nil, nil, 0, false
+		log.Warn("RonFi executeABLegTx payloads empty", "tx", s.targetTx.Hash(), "pair", pool.Address, "isAleg", isAleg)
+		return nil
 	}
 
-	if tx := s.buildExecuteTx(pool, payloads, true, isAleg, appState.GetNonce(s.execAddress), s.worker.gasPrice); tx != nil {
-		applySuccess, reverted, gasUsed, err = s.worker.applyTransaction(tx, ronFiTxHash(tx.Hash()), appState)
+	if tx := s.buildExecuteTx(payloads, isAleg, tokenPairsAndFee, arbAIn, txFee, appState.GetNonce(s.execAddress), intGasPrice, GasLimitDefault); tx != nil {
+		applySuccess, reverted, gasUsed, err = applyTransaction(s.chain, s.chainConfig, s.block, tx, ronFiTxHash(tx.Hash()), appState)
 		if !applySuccess || reverted {
-			log.Warn("RonFi Sandwich applyTransaction failed",
+			log.Warn("RonFi executeABLegTx applyTransaction failed",
 				"tx", s.targetTx.Hash(),
 				"pair", pool.Address,
 				"tokenIn", pool.TokenIn,
@@ -435,26 +407,26 @@ func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, app
 				"applySuccess", applySuccess,
 				"reverted", reverted,
 				"err", err)
-			return nil, nil, nil, 0, false
+			return nil
 		}
 
-		vlogs := appState.GetLogs(ronFiTxHash(tx.Hash()), s.worker.currentBlockNum, common.Hash{})
+		vlogs := appState.GetLogs(ronFiTxHash(tx.Hash()), s.block.NumberU64(), common.Hash{})
 		if isAleg {
-			swapPairsInfo := s.worker.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
+			swapPairsInfo := s.di.ExtractSwapPairInfo(tx, *tx.To(), vlogs, defi.RonFiExtractTypeHunting)
 			if len(swapPairsInfo) == 0 {
-				return nil, nil, nil, 0, false
+				return nil
 			}
 
 			info := swapPairsInfo[0]
 			swapAmountOut = info.AmountOut
 		}
 
-		if bAmountOut := s.worker.di.ExtractTransferAmount(vlogs, pool.TokenOut, pool.Address, txpool.RonFiSwapV3Address); bAmountOut != nil && bAmountOut.Cmp(big.NewInt(0)) > 0 {
+		if bAmountOut := s.di.ExtractTransferAmount(vlogs, pool.TokenOut, pool.Address, txpool.RonFiSwapV3Address); bAmountOut != nil && bAmountOut.Cmp(big.NewInt(0)) > 0 {
 			if isAleg && bAmountOut.Cmp(swapAmountOut) != 0 {
 				feeRate = new(big.Int).Div(new(big.Int).Mul(big.NewInt(10000), new(big.Int).Sub(swapAmountOut, bAmountOut)), swapAmountOut)
 				feeRate = new(big.Int).Add(feeRate, big.NewInt(1))
 
-				log.Warn("RonFi Sandwich bAmountOut != swapAmountOut",
+				log.Warn("RonFi executeABLegTx bAmountOut != swapAmountOut",
 					"tx", s.targetTx.Hash(),
 					"pair", pool.Address,
 					"tokenIn", pool.TokenIn,
@@ -464,9 +436,81 @@ func (s *RonSandwich) sandWichTx(pool *defi.SwapPairInfo, amountIn *big.Int, app
 					"swapAmountOut", swapAmountOut,
 					"bAmountOut", bAmountOut)
 			}
-			return tx, feeRate, bAmountOut, gasUsed, true
+			return &SandwichRes{
+				tx:        tx,
+				feeRate:   feeRate,
+				amountOut: bAmountOut,
+				gasUsed:   gasUsed,
+			}
 		}
 	}
 
-	return nil, nil, nil, 0, false
+	return nil
+}
+
+func (s *RonSandwich) buildArbTx(appState *state.StateDB, cycle *uniswap.LPCycle, amountIn *big.Int) (*types.Transaction, bool) {
+	options, err := bind.NewKeyedTransactorWithChainID(s.privKey, big.NewInt(rcommon.CHAIN_ID))
+	if err != nil {
+		log.Error("RonFi buildArbTx, get options failed!", "reason", err)
+		return nil, false
+	}
+
+	options.Nonce = new(big.Int).SetUint64(appState.GetNonce(s.execAddress))
+
+	options.Value = big.NewInt(0)
+	options.GasPrice = intGasPrice
+	options.GasLimit = GasLimitOneHop * 10
+	options.NoSend = true //only return signedTx
+
+	path := make([]common.Address, 0, len(cycle.PoolAddresses)*2)
+	dirs := make([]uint8, 0, len(cycle.PoolAddresses))
+	poolFee := make([]uint64, 0, len(cycle.PoolAddresses))
+	tokenFee := make([]uint64, 0, len(cycle.PoolAddresses))
+	poolType := make([]uint8, 0, len(cycle.PoolAddresses))
+	if len(cycle.PoolAddresses) != len(cycle.SwapVectors) {
+		log.Error("RonFi buildArbTx, swapVectors and poolAddress length mismatch")
+		return nil, false
+	}
+
+	for i := 0; i < len(cycle.PoolAddresses); i++ {
+		pool := cycle.PoolAddresses[i]
+		swapVector := cycle.SwapVectors[i]
+		token := swapVector.TokenOut
+		dir := uint8(0)
+		if !swapVector.ZeroForOne {
+			dir = 1
+		}
+		dirs = append(dirs, dir)
+		path = append(path, pool)
+		path = append(path, token)
+		poolFee = append(poolFee, swapVector.PoolFee)
+		tokenFee = append(tokenFee, swapVector.TokenFee)
+		poolType = append(poolType, swapVector.PoolType)
+	}
+
+	tokenPairsAndFee := make([]*big.Int, 2*len(cycle.PoolAddresses))
+	for i := 0; i < len(cycle.PoolAddresses); i++ {
+		tmp := new(big.Int).SetBytes(path[2*i].Bytes())
+		tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(poolFee[i]), 160))
+		tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(uint64(dirs[i])), 176))
+		tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(uint64(poolType[i])), 192))
+		tokenPairsAndFee[2*i] = tmp
+
+		tmp = new(big.Int).SetBytes(path[2*i+1].Bytes())
+		tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(tokenFee[i]), 160))
+		tokenPairsAndFee[2*i+1] = tmp
+	}
+
+	var arbTx *types.Transaction
+	if arb, e := ronV3Swap.RonSwapV3(options, tokenPairsAndFee, amountIn); e != nil {
+		log.Error("RonFi buildArbTx, create swap transaction failed!", "reason", e)
+		return nil, false
+	} else {
+		arbTx = arb
+	}
+
+	arbTx.RonTxType = types.RonTxIsArbTx
+	arbTx.RonPeerName = "self"
+
+	return arbTx, true
 }

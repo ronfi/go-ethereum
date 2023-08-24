@@ -680,7 +680,7 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 	if appState == nil {
 		log.Warn("RonFi handlePromotedTx appState is nil")
 	} else {
-		applySuccess, reverted, _, err = w.applyTransaction(tx, ronfiTxHash, appState)
+		applySuccess, reverted, _, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, tx, ronfiTxHash, appState)
 		if !applySuccess || reverted {
 			w.ReportSkipReason(tx, SkipReasonApplyTransactionFail, err)
 			return
@@ -693,7 +693,7 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 			if appState == nil {
 				log.Warn("RonFi handlePromotedTx newStatedb is nil")
 			} else {
-				w.sandwichTx(tx, swapPairsInfo, newStatedb, handlerStartTime)
+				w.huntingTxEvent(newStatedb, tx, 0, swapPairsInfo, handlerStartTime)
 			}
 		}
 	}
@@ -701,21 +701,239 @@ func (w *Worker) handlePromotedTx(tx *types.Transaction) (hunting bool) {
 	return
 }
 
-func (w *Worker) sandwichTx(tx *types.Transaction, pairsInfo []*defi.SwapPairInfo, appState *state.StateDB, handlerStartTime mclock.AbsTime) {
+func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, appState *state.StateDB, handlerStartTime mclock.AbsTime) {
+	var (
+		applySuccess, reverted bool
+		err                    string
+		realBLegGas            uint64
+		tokenPairsAndFee       []*big.Int
+		swapAmoutIn            *big.Int
+	)
+
 	randomExecutorId := tx.Hash().TailUint64()
 	ringId := randomExecutorId % w.totalExecutors
+	executorPrivKey := w.executorPrivKey[ringId]
+	executorAddress := w.executorAddress[ringId]
 
-	ronSandWich := NewRonSandwich(w, w.executorPrivKey[ringId], w.executorAddress[ringId], tx, pairsInfo, appState)
-	if ronSandWich == nil {
+	ronSandwich := NewRonSandwich(w.client, w.di, w.ronSwapInst, executorPrivKey, executorAddress, w.chain, w.chainConfig, w.currentBlock, tx, pairInfo, appState)
+	if ronSandwich == nil {
 		return
 	}
-	if txs, ok := ronSandWich.Build(); ok && len(txs) >= 3 {
-		log.Info("RonFi sandwichTx", "tx", tx.Hash().String(), "elapsed", mclock.Since(handlerStartTime))
+
+	amountIn := big.NewInt(0)
+	if !ronSandwich.optimize(pairInfo, amountIn) {
+		log.Warn("RonFi sandwichTx optimize fail", "tx", tx.Hash().String(), "pair", pairInfo.Address)
+		return
+	}
+
+	if appState, bLegAmount, aLegGas, bLegGas, ok := ronSandwich.prepare(pairInfo, amountIn); ok {
+		log.Info("RonFi sandwichTx prepare succeed",
+			"tx", tx.Hash().String(),
+			"pair", pairInfo.Address,
+			"amountIn", rcommon.EthBigInt2Float64(amountIn),
+			"bLegAmount", rcommon.EthBigInt2Float64(bLegAmount))
+
+		txs := make([]*types.Transaction, 0, 4)
+		hasArb := false
+		cycle, swapAmount, ok := w.sandwichBackRun(appState, tx, pairInfo, ronSandwich, handlerStartTime)
+		if ok {
+			hasArb = true
+		}
+		swapAmoutIn = swapAmount
+
+		// build bundle
+		aLegGas += 5000 // add 100k gas for aLeg
+		bLegGas += 5000 // add 100k gas for bLeg
+
+		_, statedbCopy := w.stateDbsConsumeOneCopy()
+		aLegNonce := statedbCopy.GetNonce(executorAddress)
+		bLegNonce := aLegNonce + 1
+		// aLegTx
+		aLegPayloads := ronSandwich.generatePayloads(pairInfo, amountIn, statedbCopy)
+		aLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(aLegGas))
+		aLegTx := ronSandwich.buildExecuteTx(aLegPayloads, true, []*big.Int{}, big.NewInt(0), aLegTxFee, aLegNonce, w.gasPrice, aLegGas)
+		// apply aLegTx
+		if applySuccess, reverted, _, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, aLegTx, aLegTx.Hash(), statedbCopy); !applySuccess || reverted {
+			log.Warn("RonFi sandwichTx apply aLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
+			return
+		}
+
+		txs = append(txs, aLegTx)
+
+		// targetTx
+		if applySuccess, reverted, _, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, tx, tx.Hash(), statedbCopy); !applySuccess || reverted {
+			log.Warn("RonFi sandwichTx apply target tx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
+			return
+		}
+
+		txs = append(txs, tx)
+
+		//bLegTx
+		rPairInfo := pairInfo.Reverse()
+		bLegPayloads := ronSandwich.generatePayloads(rPairInfo, bLegAmount, statedbCopy)
+		bLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(bLegGas))
+		var bLegTx *types.Transaction
+		if hasArb {
+			path := make([]common.Address, 0, len(cycle.PoolAddresses)*2)
+			dirs := make([]uint8, 0, len(cycle.PoolAddresses))
+			poolFee := make([]uint64, 0, len(cycle.PoolAddresses))
+			tokenFee := make([]uint64, 0, len(cycle.PoolAddresses))
+			poolType := make([]uint8, 0, len(cycle.PoolAddresses))
+			if len(cycle.PoolAddresses) != len(cycle.SwapVectors) {
+				log.Error("RonFi sandwichTx, swapVectors and poolAddress length mismatch")
+				return
+			}
+
+			for i := 0; i < len(cycle.PoolAddresses); i++ {
+				pool := cycle.PoolAddresses[i]
+				swapVector := cycle.SwapVectors[i]
+				token := swapVector.TokenOut
+				dir := uint8(0)
+				if !swapVector.ZeroForOne {
+					dir = 1
+				}
+				dirs = append(dirs, dir)
+				path = append(path, pool)
+				path = append(path, token)
+				poolFee = append(poolFee, swapVector.PoolFee)
+				tokenFee = append(tokenFee, swapVector.TokenFee)
+				poolType = append(poolType, swapVector.PoolType)
+			}
+
+			tokenPairsAndFee = make([]*big.Int, 2*len(cycle.PoolAddresses))
+			for i := 0; i < len(cycle.PoolAddresses); i++ {
+				tmp := new(big.Int).SetBytes(path[2*i].Bytes())
+				tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(poolFee[i]), 160))
+				tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(uint64(dirs[i])), 176))
+				tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(uint64(poolType[i])), 192))
+				tokenPairsAndFee[2*i] = tmp
+
+				tmp = new(big.Int).SetBytes(path[2*i+1].Bytes())
+				tmp = tmp.Add(tmp, new(big.Int).Lsh(new(big.Int).SetUint64(tokenFee[i]), 160))
+				tokenPairsAndFee[2*i+1] = tmp
+			}
+
+			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmount, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
+			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, bLegTx.Hash(), statedbCopy); !applySuccess || reverted {
+				log.Warn("RonFi sandwichTx apply bLegTx+arbTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
+				return
+			}
+
+			log.Warn("RonFi sandwichTx apply bLegTx+arbTx succeed", "tx", tx.Hash().String(), "pair", pairInfo.Address, "gasUsed", realBLegGas)
+		} else {
+			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, nil, nil, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
+			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, bLegTx.Hash(), statedbCopy); !applySuccess || reverted {
+				log.Warn("RonFi sandwichTx apply bLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
+				return
+			}
+		}
+
+		aLogs := statedbCopy.GetLogs(aLegTx.Hash(), w.currentBlockNum, common.Hash{})
+		bLogs := statedbCopy.GetLogs(bLegTx.Hash(), w.currentBlockNum, common.Hash{})
+		aPairsInfo := w.di.ExtractSwapPairInfo(aLegTx, *aLegTx.To(), aLogs, defi.RonFiExtractTypeHunting)
+		bPairsInfo := w.di.ExtractSwapPairInfo(bLegTx, *bLegTx.To(), bLogs, defi.RonFiExtractTypeHunting)
+		grossProfit := calculateSandwichProfit(pairInfo, aPairsInfo, bPairsInfo)
+		if grossProfit == nil || grossProfit.Cmp(big.NewInt(0)) <= 0 {
+			log.Warn("RonFi sandwichTx calculateSandwichProfit fail", "tx", tx.Hash().String(), "pair", pairInfo.Address)
+			return
+		}
+
+		log.Info("RonFi sandwichTx profit found!", "tx", tx.Hash().String(), "pair", pairInfo.Address, "grossProfit", rcommon.EthBigInt2Float64(grossProfit))
+		bLegTxFee = new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(grossProfit, aLegTxFee), big.NewInt(60)), big.NewInt(100))
+		realBLegGas += 5000 // add 5k gas for bLeg
+		bLegTxGas := new(big.Int).Div(bLegTxFee, big.NewInt(int64(realBLegGas)))
+		bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmoutIn, bLegTxFee, bLegNonce, bLegTxGas, realBLegGas)
+		txs = append(txs, bLegTx)
+
+		// then simulate the txs, and send them to chain
 		FlashbotSandWich(w.flashRpc, w.currentBlock, w.currentBlockNum, txs)
 	}
 }
 
 func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
+	// first check sandwich
+	for _, info := range pairsInfo {
+		if info.TokenIn == rcommon.WETH {
+			w.sandwichTx(tx, info, appState, handlerStartTime)
+		} else {
+			w.backRun(appState, tx, pairId, pairsInfo, handlerStartTime)
+		}
+	}
+
+	return
+}
+
+func (w *Worker) sandwichBackRun(appState *state.StateDB, tx *types.Transaction, pairInfo *defi.SwapPairInfo, ronSandwich *RonSandwich, handlerStartTime mclock.AbsTime) (*uniswap.LPCycle, *big.Int, bool) {
+	v3States := make(map[common.Address]*v3.PoolState)
+	v2States := make(map[common.Address]*v2.PoolState)
+
+	edge := uniswap.ToV3Edge(pairInfo)
+	if edge == nil {
+		return nil, nil, false
+	}
+
+	arbs := w.v3LoopsDb.FindLoops(edge)
+	if len(arbs) == 0 {
+		log.Info("RonFi backRun no matched loops!", "tx", tx.Hash().String(), "pair", pairInfo.Address)
+		return nil, nil, false
+	} else {
+		log.Info("RonFi backRun matched loops", "tx", tx.Hash().String(), "pair", pairInfo.Address, "loops", len(arbs))
+	}
+	profits := make(ProfitDetails, 0, len(arbs))
+	for _, arb := range arbs {
+		lpCycle := uniswap.FromAddress(w.di, tx, appState, arb[0].TokenIn, pairInfo, arb)
+		if lpCycle == nil {
+			log.Warn("RonFi backRun: uniswap.FromAddress fail", "loopId", arb.String(), "tx", tx.Hash().String(), "pair", pairInfo.Address)
+			continue
+		}
+
+		if !lpCycle.AutoUpdate(v2States, v3States) {
+			log.Info("RonFi backRun, lpCycle.AutoUpdate fail", "loopId", arb.String(), "tx", tx.Hash().String(), "pair", pairInfo.Address)
+			continue
+		}
+
+		res := lpCycle.CalculateArbitrage()
+		if res != nil && res.Profitable {
+			profit := &uniswap.CycleWithProfit{
+				Cycle:  lpCycle,
+				Profit: res,
+			}
+
+			price := defi.GetTradingTokenPrice(profit.Cycle.InputToken)
+			profitInToken := rcommon.EthBigInt2Float64(profit.Profit.BestProfit)
+			grossProfitInUsd := profitInToken / price * defi.GetTradingTokenPrice(rcommon.USDC)
+
+			txFeeInEth := rcommon.EthBigInt2Float64(new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
+			txFeeInUsd := txFeeInEth * defi.GetTradingTokenPrice(rcommon.USDC)
+			txFeeInToken := price * txFeeInEth
+			netProfitInUsd := grossProfitInUsd - txFeeInUsd
+			profitDetail := ProfitDetail{
+				loopName:         arb.String(),
+				targetToken:      profit.Cycle.InputToken,
+				amountIn:         profit.Profit.SwapAmount,
+				txFeeInToken:     txFeeInToken,
+				txFeeInUsd:       txFeeInUsd,
+				netProfitInUsd:   netProfitInUsd,
+				grossProfitInUsd: grossProfitInUsd,
+				profitInToken:    profitInToken,
+				uniProfit:        profit,
+			}
+			profits = append(profits, &profitDetail)
+
+		}
+	}
+
+	if len(profits) > 0 {
+		sort.Sort(profits)
+		highestProfit := profits[0]
+
+		return highestProfit.uniProfit.Cycle, highestProfit.uniProfit.Profit.SwapAmount, true
+	}
+
+	return nil, nil, false
+}
+
+func (w *Worker) backRun(appState *state.StateDB, tx *types.Transaction, pairId int, pairsInfo []*defi.SwapPairInfo, handlerStartTime mclock.AbsTime) {
 	v3States := make(map[common.Address]*v3.PoolState)
 	v2States := make(map[common.Address]*v2.PoolState)
 
@@ -771,34 +989,9 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 				profitInToken := rcommon.EthBigInt2Float64(profit.Profit.BestProfit)
 				grossProfitInUsd := profitInToken / price * defi.GetTradingTokenPrice(rcommon.USDC)
 
-				if grossProfitInUsd > 1000.0 {
-					for _, pool := range lpCycle.Pools {
-						switch pool.(type) {
-						case *v2.Pool:
-							v2Pool := pool.(*v2.Pool)
-							log.Info("RonFi huntingTxEvent big profit, v2Pool",
-								"idx", i, "loopId", arb.String(),
-								"tx", tx.Hash().String(),
-								"pair", v2Pool.Address,
-								"reserve0", v2Pool.State.Reserve0,
-								"reserve1", v2Pool.State.Reserve1)
-						case *v3.Pool:
-							v3Pool := pool.(*v3.Pool)
-							log.Info("RonFi huntingTxEvent big profit, v3Pool",
-								"idx", i,
-								"loopId", arb.String(),
-								"tx", tx.Hash().String(),
-								"pool", v3Pool.Address,
-								"tick", v3Pool.State.Tick,
-								"sqrtPriceX96", v3Pool.State.SqrtPriceX96,
-								"liquidity", v3Pool.State.Liquidity)
-						}
-					}
-				}
-
-				txFeeInBnb := rcommon.EthBigInt2Float64(new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
-				txFeeInUsd := txFeeInBnb * defi.GetTradingTokenPrice(rcommon.USDC)
-				txFeeInToken := price * txFeeInBnb
+				txFeeInEth := rcommon.EthBigInt2Float64(new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(profit.Cycle.SumGasNeed)))
+				txFeeInUsd := txFeeInEth * defi.GetTradingTokenPrice(rcommon.USDC)
+				txFeeInToken := price * txFeeInEth
 				netProfitInUsd := grossProfitInUsd/2.0 - txFeeInUsd
 				profitDetail := ProfitDetail{
 					loopName:         arb.String(),
@@ -812,20 +1005,6 @@ func (w *Worker) huntingTxEvent(appState *state.StateDB, tx *types.Transaction, 
 					uniProfit:        profit,
 				}
 				profits = append(profits, &profitDetail)
-
-				log.Warn("RonFi huntingTxEvent, lpCycle.CalculateArbitrage --- succeed",
-					"tx", tx.Hash().String(),
-					"idx", i,
-					"input token", profit.Cycle.InputToken,
-					"loop", arb.String(),
-					"pair", info.Address,
-					"amountIn", res.SwapAmount,
-					"grossProfitInUsd", profitDetail.grossProfitInUsd,
-					"txFeeInUsd", profitDetail.txFeeInUsd,
-					"netProfitInUsd", profitDetail.netProfitInUsd,
-					"gasPrice", w.gasPrice,
-					"gasUsed", profit.Cycle.SumGasNeed,
-				)
 			}
 		}
 
@@ -923,28 +1102,6 @@ func (w *Worker) huntingTxPair(tx *types.Transaction, pairId int, handlerStartTi
 					"block", blockNumber)
 			}
 		}
-	}
-}
-
-func (w *Worker) applyTransaction(tx *types.Transaction, txHash common.Hash, state *state.StateDB) (bool, bool, uint64, string) {
-	if state == nil {
-		return false, false, 0, "state == nil"
-	}
-
-	if w.chain == nil {
-		return false, false, 0, "w.chain == nil"
-	}
-
-	gasPool := new(core.GasPool).AddGas(85_000_000)
-
-	author := rcommon.ZeroAddress
-
-	state.SetTxContext(txHash, 0)
-	// 'applySuccess' is the status of ApplyTransaction, 'failed' is the status of whether an applied transaction is reverted (i.e. failed but packed into blockchain).
-	if applySuccess, failed, gasUsed, err := core.ApplyRonfiTransaction(w.chainConfig, w.chain, author, gasPool, state, w.currentBlock.Header(), tx, *w.chain.GetVMConfig()); applySuccess {
-		return applySuccess, failed, gasUsed, err
-	} else {
-		return applySuccess, failed, gasUsed, err
 	}
 }
 

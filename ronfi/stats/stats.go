@@ -216,11 +216,8 @@ func (s *Stats) Run() {
 					s.profitReport()
 
 					s.UpdatePairTokensInfo()
-
-					go func() {
-						s.mysql.UpdatePairGas(s.pairMaxGasUsed)
-						s.mysql.UpdateDexPairs(s.dexPairs)
-					}()
+					s.mysql.UpdatePairGas(s.pairMaxGasUsed)
+					s.mysql.UpdateDexPairs(s.dexPairs)
 
 					// report obs arbitrage contract/method statistics
 					s.obsContractReport()
