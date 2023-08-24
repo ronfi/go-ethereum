@@ -66,7 +66,7 @@ func NewRonSandwich(
 		chainConfig: chainConfig,
 		block:       block,
 		targetTx:    targetTx,
-		appState:    appState,
+		appState:    appState.Copy(),
 	}
 
 	ronSandWich.lowerBound = big.NewInt(0)
@@ -111,18 +111,18 @@ func (s *RonSandwich) prepare(pool *defi.SwapPairInfo, amountIn *big.Int) *RonSa
 	arbAIn = big.NewInt(0)
 	txFee = big.NewInt(0)
 	if res := s.executeABLegTx(pool, amountIn, appState, true, nil, tokenPairsAndFee, arbAIn, txFee); res == nil {
-		log.Warn("RonFi Sandwich Build aLegTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
+		log.Warn("RonFi Sandwich prepare aLegTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address)
 		return nil
 	} else {
 		aLegAmountOut = res.amountOut
 		feeRate = res.feeRate
 		aLegGasUsed = res.gasUsed
 	}
-	log.Info("RonFi Sandwich Build aLegTx succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", aLegAmountOut, "feeRate", feeRate)
+	log.Info("RonFi Sandwich prepare aLegTx succeed!", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", aLegAmountOut, "feeRate", feeRate)
 
 	// target tx
 	if applySuccess, reverted, _, err := applyTransaction(s.chain, s.chainConfig, s.block, s.targetTx, ronFiTxHash(s.targetTx.Hash()), appState); !applySuccess || reverted {
-		log.Warn("RonFi Sandwich Build applyTransaction targetTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
+		log.Warn("RonFi Sandwich prepare applyTransaction targetTx failed", "tx", s.targetTx.Hash(), "pair", pool.Address, "err", err)
 		return nil
 	}
 
@@ -130,15 +130,15 @@ func (s *RonSandwich) prepare(pool *defi.SwapPairInfo, amountIn *big.Int) *RonSa
 	rPool := pool.Reverse()
 	bLegAmountIn := aLegAmountOut
 	if res := s.executeABLegTx(rPool, bLegAmountIn, appState, false, feeRate, tokenPairsAndFee, arbAIn, txFee); res == nil {
-		log.Warn("RonFi Sandwich Build bLegTx failed",
+		log.Warn("RonFi Sandwich prepare bLegTx failed",
 			"tx", s.targetTx.Hash(),
 			"pair", rPool.Address,
 			"tokenIn", rPool.TokenIn,
 			"amountIn", bLegAmountIn)
 	} else {
-		log.Info("RonFi Sandwich Build bLegTx succeed!", "tx", s.targetTx.Hash(), "pair", rPool.Address, "amountIn", bLegAmountIn, "amountOut", res.amountOut)
+		log.Info("RonFi Sandwich prepare bLegTx succeed!", "tx", s.targetTx.Hash(), "pair", rPool.Address, "amountIn", bLegAmountIn, "amountOut", res.amountOut)
 		if res.amountOut.Cmp(amountIn) <= 0 {
-			log.Warn("RonFi Sandwich Build not profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", res.amountOut)
+			log.Warn("RonFi Sandwich prepare not profitable", "tx", s.targetTx.Hash(), "pair", pool.Address, "amountIn", amountIn, "amountOut", res.amountOut)
 		} else {
 			bLegGasUsed = res.gasUsed
 			return &RonSandwichPrepRes{

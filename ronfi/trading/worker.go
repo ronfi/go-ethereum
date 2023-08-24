@@ -707,7 +707,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		err                    string
 		realBLegGas            uint64
 		tokenPairsAndFee       []*big.Int
-		swapAmoutIn            *big.Int
+		swapAmountIn           *big.Int
 	)
 
 	randomExecutorId := tx.Hash().TailUint64()
@@ -736,18 +736,14 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			"bLegAmount", rcommon.EthBigInt2Float64(bLegAmount))
 
 		txs := make([]*types.Transaction, 0, 4)
-		hasArb := false
-		cycle, swapAmount, ok := w.sandwichBackRun(appState, tx, pairInfo, ronSandwich, handlerStartTime)
-		if ok {
-			hasArb = true
-		}
-		swapAmoutIn = swapAmount
+		cycle, swapAmount, hasArb := w.sandwichBackRun(res.appState, tx, pairInfo, ronSandwich, handlerStartTime)
+		swapAmountIn = swapAmount
 
 		// build bundle
 		aLegGas := res.aLegGasUsed + 5000 // add 100k gas for aLeg
 		bLegGas := res.bLegGasUsed + 5000 // add 100k gas for bLeg
 
-		_, statedbCopy := w.stateDbsConsumeOneCopy()
+		statedbCopy := appState.Copy()
 		aLegNonce := statedbCopy.GetNonce(executorAddress)
 		bLegNonce := aLegNonce + 1
 		// aLegTx
@@ -759,7 +755,6 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			log.Warn("RonFi sandwichTx apply aLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 			return
 		}
-
 		txs = append(txs, aLegTx)
 
 		// targetTx
@@ -767,7 +762,6 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			log.Warn("RonFi sandwichTx apply target tx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 			return
 		}
-
 		txs = append(txs, tx)
 
 		//bLegTx
@@ -843,8 +837,8 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		log.Info("RonFi sandwichTx profit found!", "tx", tx.Hash().String(), "pair", pairInfo.Address, "grossProfit", rcommon.EthBigInt2Float64(grossProfit))
 		bLegTxFee = new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(grossProfit, aLegTxFee), big.NewInt(60)), big.NewInt(100))
 		realBLegGas += 5000 // add 5k gas for bLeg
-		bLegTxGas := new(big.Int).Div(bLegTxFee, big.NewInt(int64(realBLegGas)))
-		bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmoutIn, bLegTxFee, bLegNonce, bLegTxGas, realBLegGas)
+		bLegTxGasPrice := new(big.Int).Div(bLegTxFee, big.NewInt(int64(realBLegGas)))
+		bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, bLegTxFee, bLegNonce, bLegTxGasPrice, realBLegGas)
 		txs = append(txs, bLegTx)
 
 		// then simulate the txs, and send them to chain
