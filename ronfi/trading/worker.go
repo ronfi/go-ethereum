@@ -421,9 +421,9 @@ func (w *Worker) stateDbsConsumeOneCopy() (blockHash common.Hash, stateDb *state
 		stateDb = w.idleState.Copy()
 		w.idleStateDbsLock.Unlock()
 		if err := w.PushStateDbsCopyEvent(); err != nil {
-			log.Warn("RonFi stateDbsConsumeOneCopy -- 11 -- push StateDbsCopyEvent", "error", err)
+			log.Warn("RonFi stateDbsConsumeOneCopy push StateDbsCopyEvent", "error", err)
 		}
-		log.Warn("RonFi idleStateDbs run out, fallback to local copy")
+		//log.Warn("RonFi idleStateDbs run out, fallback to local copy")
 		return
 	}
 	stateDb = w.idleStateDbs[0]
@@ -432,7 +432,7 @@ func (w *Worker) stateDbsConsumeOneCopy() (blockHash common.Hash, stateDb *state
 	w.idleStateDbsLock.Unlock()
 	if remains <= maxStateDbsCopies/2 { // half of stateDbs have been consumed
 		if err := w.PushStateDbsCopyEvent(); err != nil {
-			log.Warn("RonFi stateDbsConsumeOneCopy -- 22 -- push StateDbsCopyEvent", "error", err)
+			log.Warn("RonFi stateDbsConsumeOneCopy push StateDbsCopyEvent", "error", err)
 		}
 	}
 	return

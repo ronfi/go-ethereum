@@ -358,6 +358,7 @@ func (s *RonSandwich) buildExecuteTx(payloads []ronswapv3fe.RonSwapV3FEPayload, 
 		options.Value = big.NewInt(0)
 		options.GasLimit = gas
 		options.GasPrice = gasPrice
+		options.GasFeeCap = gasPrice
 		options.NoSend = true //only return signedTx
 
 		if tx, err := s.ronSwapInst.RonSandwich(options, isAleg, payloads, tokenPairsAndFee, amountIn, txFee); err == nil {
