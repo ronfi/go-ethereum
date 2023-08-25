@@ -707,7 +707,6 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		err                    string
 		gasUsed, realBLegGas   uint64
 		tokenPairsAndFee       []*big.Int
-		swapAmountIn           *big.Int
 	)
 
 	randomExecutorId := tx.Hash().TailUint64()
@@ -763,8 +762,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		txs = append(txs, tx)
 
 		//bLegTx
-		cycle, swapAmount, hasArb := w.sandwichBackRun(res.appState, tx, pairInfo, ronSandwich, handlerStartTime)
-		swapAmountIn = swapAmount
+		cycle, swapAmountIn, hasArb := w.sandwichBackRun(res.appState, tx, pairInfo, ronSandwich, handlerStartTime)
 		rPairInfo := pairInfo.Reverse()
 		bLegPayloads, _ := ronSandwich.generatePayloads(rPairInfo, bLegAmount, res.tokenFee, statedbCopy)
 		bLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(bLegGas))
@@ -809,7 +807,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 				tokenPairsAndFee[2*i+1] = tmp
 			}
 
-			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmount, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
+			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
 			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, ronFiTxHash(bLegTx.Hash()), statedbCopy); !applySuccess || reverted {
 				log.Warn("RonFi sandwichTx apply bLegTx+arbTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 				return
