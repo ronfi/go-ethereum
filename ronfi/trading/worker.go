@@ -807,6 +807,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 				tokenPairsAndFee[2*i+1] = tmp
 			}
 
+			bLegGas += cycle.SumGasNeed
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, big.NewInt(0), bLegNonce, w.gasPrice, bLegGas)
 		} else {
 			swapAmountIn = big.NewInt(0)
@@ -833,7 +834,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			realBLegGas += 500000 // add 500k gas for bLeg
 			bLegTxGasPrice := new(big.Int).Div(bLegTxFee, big.NewInt(int64(realBLegGas)))
 			if bLegTxGasPrice.Cmp(w.gasPrice) < 0 {
-				log.Warn("RonFi sandwichTx minimal profit!", "baseFee", w.gasPrice, "bLegGasPrice", bLegTxGasPrice, "bLegTxFee", rcommon.EthBigInt2Float64(bLegTxFee), "bLegGas", realBLegGas)
+				log.Warn("RonFi sandwichTx trivial profit!", "baseFee", w.gasPrice, "bLegGasPrice", bLegTxGasPrice, "bLegTxFee", rcommon.EthBigInt2Float64(bLegTxFee), "bLegGas", realBLegGas)
 				return
 			}
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, bLegTxFee, bLegNonce, bLegTxGasPrice, realBLegGas)
