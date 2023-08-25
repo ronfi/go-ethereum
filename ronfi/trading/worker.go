@@ -847,7 +847,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 				"RonFi sandwichTx bundle sent!",
 				"target tx", tx.Hash().String(),
 				"grossProfit", rcommon.EthBigInt2Float64(grossProfit),
-				"bribe fee", rcommon.EthBigInt2Float64(bLegTxFee),
+				"bribe fee", rcommon.EthBigInt2Float64(new(big.Int).Add(aLegTxFee, bLegTxFee)),
 				"bLegTxGasPrice", bLegTxGasPrice,
 				"#", totalArbTxs)
 		}
