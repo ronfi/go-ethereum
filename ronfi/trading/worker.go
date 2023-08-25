@@ -457,7 +457,7 @@ func (w *Worker) queueTxsFilter(txs types.Transactions) (filteredTxs types.Trans
 	sameFromAndTo := make(map[common.Address]struct{}, len(txs))
 	filtered := 0
 	sigCached := 0
-	start := mclock.Now()
+	//start := mclock.Now()
 	for _, tx := range txs {
 		if sender, cache, err := types.RonFiSender(w.signer, tx); err != nil {
 			continue
@@ -478,8 +478,8 @@ func (w *Worker) queueTxsFilter(txs types.Transactions) (filteredTxs types.Trans
 			}
 		}
 	}
-	elapsed := mclock.Since(start)
-	log.Info("RonFi hunting 2nd filter", "block", w.currentBlockNum, "sigCached", sigCached, "filtered", filtered, "remain", len(filteredTxs), "elapsed", elapsed)
+	//elapsed := mclock.Since(start)
+	//log.Info("RonFi hunting 2nd filter", "block", w.currentBlockNum, "sigCached", sigCached, "filtered", filtered, "remain", len(filteredTxs), "elapsed", elapsed)
 	return
 }
 
