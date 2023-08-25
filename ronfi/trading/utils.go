@@ -116,52 +116,46 @@ func calculateSandwichProfit(pool *defi.SwapPairInfo, aPairsInfo, bPairsInfo []*
 		arbIn, arbOut               *big.Int
 	)
 
-	if len(aPairsInfo) > 0 && len(bPairsInfo) > 0 {
-		for _, pairInfo := range aPairsInfo {
-			if pairInfo.Address == pool.Address && pool.Dir == pairInfo.Dir {
-				aLegAmountIn = pairInfo.AmountIn
-				break
+	if len(aPairsInfo) != 1 {
+		return nil
+	}
+
+	aLegPairInfo := aPairsInfo[0]
+	if aLegPairInfo.Address != pool.Address || aLegPairInfo.Dir != pool.Dir {
+		return nil
+	} else {
+		aLegAmountIn = aLegPairInfo.AmountIn
+	}
+
+	if len(bPairsInfo) == 0 {
+		return nil
+	}
+
+	bLegPairInfo := bPairsInfo[0]
+	if bLegPairInfo.Address != pool.Address || bLegPairInfo.Dir == pool.Dir {
+		return nil
+	} else {
+		bLegAmountOut = bLegPairInfo.AmountOut
+	}
+	profit = new(big.Int).Sub(bLegAmountOut, aLegAmountIn)
+
+	if len(bPairsInfo) > 1 {
+		// find in and out amount for arb loop
+		for _, pairInfo := range bPairsInfo[1:] {
+			if pairInfo.Address == pool.Address {
+				if pool.Dir == pairInfo.Dir {
+					arbIn = pairInfo.AmountIn
+				} else {
+					arbOut = pairInfo.AmountOut
+				}
 			}
 		}
 
-		if len(bPairsInfo) > 1 {
-			// arb loop exists
-			// first reversed pair is the b leg
-			bLegPair := bPairsInfo[0]
-			bLegAmountOut = bLegPair.AmountOut
-			if aLegAmountIn != nil && bLegAmountOut != nil {
-				profit = big.NewInt(0).Sub(bLegAmountOut, aLegAmountIn)
-			}
-
-			// find in and out amount for arb loop
-			for _, pairInfo := range bPairsInfo[1:] {
-				if pairInfo.Address == pool.Address {
-					if pool.Dir == pairInfo.Dir {
-						arbIn = pairInfo.AmountIn
-					} else {
-						arbOut = pairInfo.AmountOut
-					}
-				}
-			}
-
-			if arbIn != nil && arbOut != nil {
-				// calculate profit
-				arbProfit := big.NewInt(0).Sub(profit, big.NewInt(0).Sub(arbIn, arbOut))
-				if profit != nil {
-					profit.Add(profit, arbProfit)
-				}
-			}
-		} else {
-			for _, pairInfo := range aPairsInfo {
-				if pairInfo.Address == pool.Address && pool.Dir != pairInfo.Dir {
-					bLegAmountOut = pairInfo.AmountOut
-					break
-				}
-			}
-
-			if aLegAmountIn != nil && bLegAmountOut != nil {
-				// calculate profit
-				profit = big.NewInt(0).Sub(bLegAmountOut, aLegAmountIn)
+		if arbIn != nil && arbOut != nil {
+			// calculate profit
+			arbProfit := new(big.Int).Sub(arbOut, arbIn)
+			if profit != nil {
+				profit.Add(profit, arbProfit)
 			}
 		}
 	}
