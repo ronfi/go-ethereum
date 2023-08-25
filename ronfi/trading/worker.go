@@ -809,14 +809,14 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 				tokenPairsAndFee[2*i+1] = tmp
 			}
 
-			bLegGas += cycle.SumGasNeed
+			bLegGas += cycle.SumGasNeed + 5000000 // plus 500K gas for arb
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, big.NewInt(0), bLegNonce, w.gasPrice, bLegGas)
 		} else {
 			swapAmountIn = big.NewInt(0)
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, big.NewInt(0), bLegNonce, w.gasPrice, bLegGas)
 		}
 		if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, ronFiTxHash(bLegTx.Hash()), statedbCopy); !applySuccess || reverted {
-			log.Warn("RonFi sandwichTx apply bLegTx+arbTx fail", "tx", tx.Hash().String(), "hasArb", hasArb, "err", err)
+			log.Warn("RonFi sandwichTx apply bLegTx fail", "tx", tx.Hash().String(), "hasArb", hasArb, "err", err)
 			return
 		}
 		bLogs := statedbCopy.GetLogs(ronFiTxHash(bLegTx.Hash()), w.currentBlockNum, common.Hash{})
