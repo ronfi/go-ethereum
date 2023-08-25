@@ -737,8 +737,8 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		txs := make([]*types.Transaction, 0, 3)
 
 		// build bundle
-		aLegGas := res.aLegGasUsed + 5000 // add 100k gas for aLeg
-		bLegGas := res.bLegGasUsed + 5000 // add 100k gas for bLeg
+		aLegGas := res.aLegGasUsed + 500000 // add 500K gas for aLeg
+		bLegGas := res.bLegGasUsed + 500000 // add 500K gas for bLeg
 
 		statedbCopy := appState.Copy()
 		aLegNonce := statedbCopy.GetNonce(executorAddress)
@@ -815,7 +815,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 
 			log.Warn("RonFi sandwichTx apply bLegTx+arbTx succeed", "tx", tx.Hash().String(), "pair", pairInfo.Address, "gasUsed", realBLegGas)
 		} else {
-			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, nil, nil, bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
+			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, []*big.Int{}, big.NewInt(0), bLegTxFee, bLegNonce, w.gasPrice, bLegGas)
 			if applySuccess, reverted, realBLegGas, err = applyTransaction(w.chain, w.chainConfig, w.currentBlock, bLegTx, ronFiTxHash(bLegTx.Hash()), statedbCopy); !applySuccess || reverted {
 				log.Warn("RonFi sandwichTx apply bLegTx fail", "tx", tx.Hash().String(), "pair", pairInfo.Address, "err", err)
 				return
