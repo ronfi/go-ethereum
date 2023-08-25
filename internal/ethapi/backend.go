@@ -74,7 +74,7 @@ type Backend interface {
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
 	StartStats()
 	StopStats()
-	StartArbing(dryRun bool, minHuntingProfit int)
+	StartArbing(dryRun bool, minHuntingProfit int, sandwichRatio int)
 	StopArbing()
 	ReloadLoops()
 	ResetStats()

@@ -869,8 +869,8 @@ func (s *BlockChainAPI) StopStats() {
 	s.b.StopStats()
 }
 
-func (s *BlockChainAPI) StartArbing(dryRun bool, minHuntingProfit int) {
-	s.b.StartArbing(dryRun, minHuntingProfit)
+func (s *BlockChainAPI) StartArbing(dryRun bool, minHuntingProfit int, sandwichRatio int) {
+	s.b.StartArbing(dryRun, minHuntingProfit, sandwichRatio)
 }
 
 func (s *BlockChainAPI) StopArbing() {

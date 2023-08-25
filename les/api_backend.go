@@ -343,7 +343,7 @@ func (b *LesApiBackend) StartStats() {
 func (b *LesApiBackend) StopStats() {
 }
 
-func (b *LesApiBackend) StartArbing(dryRun bool, minHuntingProfit int) {
+func (b *LesApiBackend) StartArbing(dryRun bool, minHuntingProfit int, sandwichRatio int) {
 }
 
 func (b *LesApiBackend) StopArbing() {

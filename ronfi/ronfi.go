@@ -40,6 +40,7 @@ type RonArbiter struct {
 	oracleInitialized bool
 	dryRun            bool
 	minHuntingProfit  float64 // Trigger the hunting if profitInToken >= txFeeInToken*this
+	sandwichRatio     int
 	v3LoopsDb         *uniswap.V3Loops
 	pairGasMap        map[string]uint64         // the gas required for a pair swap (key: pair+dir)
 	dexPairsMap       map[common.Address]uint64 // collection of all dex pairs
@@ -121,7 +122,7 @@ func (r *RonArbiter) ReloadLoops() {
 	}
 }
 
-func (r *RonArbiter) Start(dryRun bool, minHuntingProfit int) {
+func (r *RonArbiter) Start(dryRun bool, minHuntingProfit int, sandwichRatio int) {
 	log.Info("RonFi arb start",
 		"dryRun", dryRun,
 		"minHuntingProfit", minHuntingProfit,
@@ -129,6 +130,10 @@ func (r *RonArbiter) Start(dryRun bool, minHuntingProfit int) {
 
 	r.dryRun = dryRun
 	r.minHuntingProfit = float64(rcommon.MaxInt(minHuntingProfit, 10)) / 100 // Unit: cent. For example: 100 means $1.00, 1000 means $10.00. Minimum allowed value here is 10 means $0.10
+	r.sandwichRatio = rcommon.MinInt(sandwichRatio, 99)
+	if r.sandwichRatio <= 0 {
+		r.sandwichRatio = 50 // min ration 50%
+	}
 
 	r.startCh <- "start"
 }
@@ -208,7 +213,7 @@ func (r *RonArbiter) mainLoop() {
 
 		case <-r.startCh:
 			if !rpc.StartTrading {
-				r.worker = trading.NewWorker(r.eth, r.chainConfig, r.client, r.di, r.dryRun, r.minHuntingProfit)
+				r.worker = trading.NewWorker(r.eth, r.chainConfig, r.client, r.di, r.dryRun, r.minHuntingProfit, r.sandwichRatio)
 				if pri := os.Getenv("EXECUTOR_PRIVATE_KEY"); len(pri) < 64 {
 					log.Warn("RonFi mainLoop fail to start. empty or wrong private key")
 				} else if !r.worker.Init(pri, r.pairGasMap, r.v3LoopsDb) {

@@ -173,6 +173,7 @@ type Worker struct {
 
 	dryRun           bool
 	minHuntingProfit float64 // Trigger the hunting if profitInToken >= txFeeInToken*this
+	sandwichRatio    int
 	v3LoopsDb        *uniswap.V3Loops
 
 	startTime           mclock.AbsTime
@@ -199,7 +200,7 @@ type Worker struct {
 	numCPU int
 }
 
-func NewWorker(eth rcommon.Backend, chainConfig *params.ChainConfig, client *ethclient.Client, di *defi.Info, dryRun bool, minHuntingProfit float64) *Worker {
+func NewWorker(eth rcommon.Backend, chainConfig *params.ChainConfig, client *ethclient.Client, di *defi.Info, dryRun bool, minHuntingProfit float64, sandwichRatio int) *Worker {
 	return &Worker{
 		eth:              eth,
 		chain:            eth.BlockChain(),
@@ -210,6 +211,7 @@ func NewWorker(eth rcommon.Backend, chainConfig *params.ChainConfig, client *eth
 		di:               di,
 		dryRun:           dryRun,
 		minHuntingProfit: minHuntingProfit,
+		sandwichRatio:    sandwichRatio,
 		numCPU:           runtime.NumCPU(),
 	}
 }
@@ -830,7 +832,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		bLegTxFee := new(big.Int).Mul(w.gasPrice, new(big.Int).SetUint64(res.bLegGasUsed))
 		baseBundleTxFee := new(big.Int).Add(aLegTxFee, bLegTxFee)
 		if grossProfit.Cmp(baseBundleTxFee) > 0 {
-			bLegTxFee = new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(grossProfit, aLegTxFee), big.NewInt(60)), big.NewInt(100))
+			bLegTxFee = new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(grossProfit, aLegTxFee), big.NewInt(int64(w.sandwichRatio))), big.NewInt(100))
 			realBLegGas += 500000 // add 500k gas for bLeg
 			bLegTxGasPrice := new(big.Int).Div(bLegTxFee, big.NewInt(int64(realBLegGas)))
 			if bLegTxGasPrice.Cmp(w.gasPrice) < 0 {

@@ -538,9 +538,9 @@ func (s *Ethereum) Stop() error {
 func (s *Ethereum) IsArbing() bool { return s.ronArbiter.Arbing() }
 
 // StartArbing start RonFi arbitrage service.
-func (s *Ethereum) StartArbing(dryRun bool, minHuntingProfit int) {
+func (s *Ethereum) StartArbing(dryRun bool, minHuntingProfit int, sandwichRatio int) {
 	if !s.IsArbing() {
-		go s.ronArbiter.Start(dryRun, minHuntingProfit)
+		go s.ronArbiter.Start(dryRun, minHuntingProfit, sandwichRatio)
 	}
 }
 
