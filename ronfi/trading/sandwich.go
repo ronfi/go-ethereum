@@ -66,7 +66,7 @@ func NewRonSandwich(
 		chainConfig: chainConfig,
 		block:       block,
 		targetTx:    targetTx,
-		appState:    appState.Copy(),
+		appState:    appState,
 	}
 
 	ronSandWich.lowerBound = big.NewInt(0)

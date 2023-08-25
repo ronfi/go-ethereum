@@ -714,7 +714,7 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 	executorPrivKey := w.executorPrivKey[ringId]
 	executorAddress := w.executorAddress[ringId]
 
-	ronSandwich := NewRonSandwich(w.client, w.di, w.ronSwapInst, executorPrivKey, executorAddress, w.chain, w.chainConfig, w.currentBlock, tx, pairInfo, appState)
+	ronSandwich := NewRonSandwich(w.client, w.di, w.ronSwapInst, executorPrivKey, executorAddress, w.chain, w.chainConfig, w.currentBlock, tx, pairInfo, appState.Copy())
 	if ronSandwich == nil {
 		return
 	}
