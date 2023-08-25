@@ -725,14 +725,14 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 		return
 	}
 
-	if res := ronSandwich.prepare(pairInfo, amountIn); res != nil {
+	if res := ronSandwich.prepare(pairInfo, amountIn); res != nil && res.bLegAmountIn.Cmp(big.NewInt(0)) > 0 {
 		bLegAmount := res.bLegAmountIn
 
 		log.Info("RonFi sandwichTx prepare succeed",
 			"tx", tx.Hash().String(),
 			"pair", pairInfo.Address,
-			"amountIn", rcommon.EthBigInt2Float64(amountIn),
-			"bLegAmount", rcommon.EthBigInt2Float64(bLegAmount))
+			"amountIn", amountIn,
+			"bLegAmount", bLegAmount)
 
 		txs := make([]*types.Transaction, 0, 3)
 
