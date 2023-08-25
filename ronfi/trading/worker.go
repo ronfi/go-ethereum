@@ -832,13 +832,17 @@ func (w *Worker) sandwichTx(tx *types.Transaction, pairInfo *defi.SwapPairInfo, 
 			bLegTxFee = new(big.Int).Div(new(big.Int).Mul(new(big.Int).Sub(grossProfit, aLegTxFee), big.NewInt(60)), big.NewInt(100))
 			realBLegGas += 500000 // add 500k gas for bLeg
 			bLegTxGasPrice := new(big.Int).Div(bLegTxFee, big.NewInt(int64(realBLegGas)))
+			if bLegTxGasPrice.Cmp(w.gasPrice) < 0 {
+				log.Warn("RonFi sandwichTx minimal profit!", "baseFee", w.gasPrice, "bLegGasPrice", bLegTxGasPrice, "bLegTxFee", rcommon.EthBigInt2Float64(bLegTxFee), "bLegGas", realBLegGas)
+				return
+			}
 			bLegTx = ronSandwich.buildExecuteTx(bLegPayloads, false, tokenPairsAndFee, swapAmountIn, bLegTxFee, bLegNonce, bLegTxGasPrice, realBLegGas)
 			txs = append(txs, bLegTx)
 
 			// then simulate the txs, and send them to chain
 			FlashbotSandWich(w.flashRpc, w.currentBlock, w.currentBlockNum, txs)
 			totalArbTxs := atomic.AddUint64(&w.totalArbTxs, 1)
-			log.Warn(
+			log.Info(
 				"RonFi sandwichTx bundle sent!",
 				"target tx", tx.Hash().String(),
 				"grossProfit", rcommon.EthBigInt2Float64(grossProfit),

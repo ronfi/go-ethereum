@@ -357,7 +357,7 @@ func (s *RonSandwich) buildExecuteTx(payloads []ronswapv3fe.RonSwapV3FEPayload, 
 		options.Nonce = new(big.Int).SetUint64(nonce)
 		options.Value = big.NewInt(0)
 		options.GasLimit = gas
-		options.GasPrice = gasPrice
+		options.GasTipCap = big.NewInt(params.GWei) // 1Gwei
 		options.GasFeeCap = gasPrice
 		options.NoSend = true //only return signedTx
 

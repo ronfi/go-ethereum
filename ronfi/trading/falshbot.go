@@ -65,39 +65,41 @@ func simulateFlashbotBundle(dexTxHex, arbTxHex string, expectedBlock uint64) {
 }
 
 func FlashbotSandWich(flashRpc *flashbotsrpc.BuilderBroadcastRPC, block *types.Block, currentBlock uint64, txs []*types.Transaction) {
-	aLegTxBytes, err := rlp.EncodeToBytes(txs[0])
-	if err != nil {
+	if aLegTxData, err := txs[0].MarshalBinary(); err != nil {
 		log.Warn("RonFi Flashbot encode aLegTx failed", "err", err)
-	}
-	aLegTxHex := fmt.Sprintf("0x%x", aLegTxBytes)
-
-	targetTx, err := txs[1].MarshalBinary()
-	if err != nil {
-		log.Warn("RonFi Flashbot encode targetTx failed", "err", err)
-	}
-	targetTxHex := fmt.Sprintf("0x%x", targetTx)
-
-	bLegTxBytes, err := rlp.EncodeToBytes(txs[2])
-	if err != nil {
-		log.Warn("RonFi Flashbot encode bLegTx failed", "err", err)
-	}
-	bLegTxHex := fmt.Sprintf("0x%x", bLegTxBytes)
-
-	expectedBlock := currentBlock + 1
-
-	simulateFlashbotSandWichBundle(aLegTxHex, targetTxHex, bLegTxHex, expectedBlock)
-
-	sendBundleArgs := flashbotsrpc.FlashbotsSendBundleRequest{
-		Txs:         []string{aLegTxHex, targetTxHex, bLegTxHex},
-		BlockNumber: fmt.Sprintf("0x%x", expectedBlock),
-	}
-
-	results := flashRpc.BroadcastBundle(privateKey, sendBundleArgs)
-	for _, result := range results {
-		if result.Err != nil {
-			log.Warn("RonFi FlashbotSandWich broadcast failed", "tx", txs[1].Hash().String(), "err", result.Err)
+		return
+	} else {
+		aLegTxHex := fmt.Sprintf("0x%x", aLegTxData)
+		if targetTx, err := txs[1].MarshalBinary(); err != nil {
+			log.Warn("RonFi Flashbot encode targetTx failed", "err", err)
+			return
 		} else {
-			log.Info("RonFi FlashbotSandWich", "response", result.BundleResponse.BundleHash)
+			targetTxHex := fmt.Sprintf("0x%x", targetTx)
+
+			if bLegTxData, err := txs[2].MarshalBinary(); err != nil {
+				log.Warn("RonFi Flashbot encode bLegTx failed", "err", err)
+				return
+			} else {
+				bLegTxHex := fmt.Sprintf("0x%x", bLegTxData)
+
+				expectedBlock := currentBlock + 1
+
+				simulateFlashbotSandWichBundle(aLegTxHex, targetTxHex, bLegTxHex, expectedBlock)
+
+				sendBundleArgs := flashbotsrpc.FlashbotsSendBundleRequest{
+					Txs:         []string{aLegTxHex, targetTxHex, bLegTxHex},
+					BlockNumber: fmt.Sprintf("0x%x", expectedBlock),
+				}
+
+				results := flashRpc.BroadcastBundle(privateKey, sendBundleArgs)
+				for _, result := range results {
+					if result.Err != nil {
+						log.Warn("RonFi FlashbotSandWich broadcast failed", "tx", txs[1].Hash().String(), "err", result.Err)
+					} else {
+						log.Info("RonFi FlashbotSandWich", "response", result.BundleResponse.BundleHash)
+					}
+				}
+			}
 		}
 	}
 }
