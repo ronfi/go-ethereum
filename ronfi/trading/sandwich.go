@@ -408,12 +408,12 @@ func (s *RonSandwich) executeABLegTx(pool *defi.SwapPairInfo, amountIn *big.Int,
 
 			info := swapPairsInfo[0]
 			swapAmountOut = info.AmountOut
-			if swapAmountOut.Cmp(big.NewInt(0)) < 0 {
+			if swapAmountOut != nil && swapAmountOut.Cmp(big.NewInt(0)) < 0 {
 				swapAmountOut = new(big.Int).Neg(swapAmountOut)
 			}
 		}
 
-		bAmountOut := new(big.Int).Abs(s.di.ExtractTransferAmount(vlogs, pool.TokenOut, pool.Address, txpool.RonFiSwapV3Address))
+		bAmountOut := s.di.ExtractTransferAmount(vlogs, pool.TokenOut, pool.Address, txpool.RonFiSwapV3Address)
 		if bAmountOut != nil && bAmountOut.Cmp(big.NewInt(0)) > 0 {
 			if isAleg && bAmountOut.Cmp(swapAmountOut) != 0 {
 				feeRate = new(big.Int).Div(new(big.Int).Mul(big.NewInt(10000), new(big.Int).Sub(swapAmountOut, bAmountOut)), swapAmountOut)
