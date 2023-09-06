@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	rcommon "github.com/ethereum/go-ethereum/ronfi/common"
-	algebrapool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_algebrapool"
 	v3pool "github.com/ethereum/go-ethereum/ronfi/contracts/contract_v3pool"
 	"math/big"
 	"strings"
@@ -287,74 +286,6 @@ func (di *Info) ExtractSwapPairInfo(tx *types.Transaction, router common.Address
 						Reserve1:     nil,
 						Tick:         tick,
 						SqrtPriceX96: sqrtPriceX96,
-						Liquidity:    liquidity,
-						Dir:          uint64(dir),
-					}
-					swapPairsInfo = append(swapPairsInfo, &swapPairInfo)
-				}
-			case state.ApSwapEvent:
-				if len(data) == 160 && len(vlog.Topics) == 3 {
-					if eType == RonFiExtractTypeHunting {
-						continue
-					}
-
-					poolInfo = di.GetPoolInfo(address)
-					if poolInfo == nil {
-						continue
-					}
-
-					sender = common.BytesToAddress(vlog.Topics[1].Bytes())
-					//if eType == RonFiExtractTypeStats && (sender != router && sender != address) {
-					//	continue // when calculate profit, ignore irrelevant swap events. relevant only if sender is router address
-					//}
-					to = common.BytesToAddress(vlog.Topics[2].Bytes())
-					token0 := poolInfo.Token0
-					token1 := poolInfo.Token1
-
-					apAbi, err := abi.JSON(strings.NewReader(algebrapool.AlgebrapoolMetaData.ABI))
-					if err != nil {
-						continue
-					}
-					unpack, err := apAbi.Unpack("Swap", data)
-					if err != nil {
-						continue
-					}
-					amount0 := unpack[0].(*big.Int)
-					amount1 := unpack[1].(*big.Int)
-					price := unpack[2].(*big.Int)
-					liquidity := unpack[3].(*big.Int)
-					tick := int(unpack[4].(*big.Int).Int64())
-
-					dir = 0
-					if (amount0.Cmp(big.NewInt(0)) < 0) && (amount1.Cmp(big.NewInt(0)) > 0) {
-						dir = 1
-					}
-					if dir == 0 {
-						tokenIn = token0
-						tokenOut = token1
-						amountIn = new(big.Int).Abs(amount0)
-						amountOut = new(big.Int).Abs(amount1)
-					} else {
-						tokenIn = token1
-						tokenOut = token0
-						amountIn = new(big.Int).Abs(amount1)
-						amountOut = new(big.Int).Abs(amount0)
-					}
-					key = fmt.Sprintf("%s-%d", address, dir^1)
-					swapPairInfo := SwapPairInfo{
-						Address:      address,
-						Key:          key,
-						V3:           true,
-						BothBriToken: false,
-						TokenIn:      tokenIn,
-						TokenOut:     tokenOut,
-						KeyToken:     tokenIn,
-						AmountIn:     amountIn,
-						AmountOut:    amountOut,
-						Reserve0:     nil,
-						Reserve1:     nil,
-						Tick:         tick,
-						SqrtPriceX96: price,
 						Liquidity:    liquidity,
 						Dir:          uint64(dir),
 					}
